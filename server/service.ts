@@ -85,7 +85,7 @@ export class RepairService {
       }
       if (!input.followupId) throw new AppError('Choose an existing follow-up.');
       const prior = this.store.get<Followup>('followup', input.followupId, input.caseId);
-      const value: Followup = { ...prior, dueAt: input.dueAt ?? prior.dueAt, timezone: input.timezone, status: input.action === 'cancel' ? 'cancelled' : input.action === 'complete' ? 'completed' : 'scheduled' };
+      const value: Followup = { ...prior, dueAt: input.dueAt ?? prior.dueAt, timezone: input.timezone, ...(input.action === 'reschedule' ? { title: input.title ?? prior.title, questionId: input.questionId === undefined ? prior.questionId : input.questionId } : {}), status: input.action === 'cancel' ? 'cancelled' : input.action === 'complete' ? 'completed' : 'scheduled' };
       this.store.put('followup', value); return value;
     });
   }

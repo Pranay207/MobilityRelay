@@ -132,6 +132,26 @@ test('follow-ups persist actions, validate time zones, and never send', () => {
   const completed = s.service.followup({ caseId: s.c.id, requestId: randomUUID(), action: 'complete', followupId: f.id, timezone: 'Asia/Kolkata' }); assert.equal(completed.status, 'completed');
   assert.throws(() => s.service.followup({ caseId: s.c.id, requestId: randomUUID(), action: 'create', title: 'Bad', dueAt: '2020-01-01T00:00:00Z', timezone: 'Not/AZone' }), /valid IANA/); assert.equal(s.deliveries(), 0); s.store.close();
 });
+
+test('rescheduling preserves edited follow-up details and can clear a related question', () => {
+  const s = setup();
+  try {
+    s.event('parts_delayed'); s.event('loaner_needed');
+    const questions = s.store.brief(s.c.id).questions;
+    const parts = questions.find(q => q.kind === 'parts')!;
+    const loaner = questions.find(q => q.kind === 'loaner')!;
+    const f = s.service.followup({ caseId: s.c.id, requestId: randomUUID(), action: 'create', title: 'Ask about parts', questionId: parts.id, dueAt: new Date(Date.now() + 86400000).toISOString(), timezone: 'Asia/Kolkata' });
+    const input = { caseId: s.c.id, requestId: randomUUID(), action: 'reschedule' as const, followupId: f.id, title: 'Ask about temporary equipment', questionId: loaner.id, dueAt: new Date(Date.now() + 172800000).toISOString(), timezone: 'America/New_York' };
+    const edited = s.service.followup(input);
+    assert.equal(edited.title, input.title); assert.equal(edited.questionId, loaner.id); assert.equal(edited.timezone, input.timezone);
+    assert.deepEqual(s.service.followup(input), edited);
+    const unchanged = s.service.followup({ caseId: s.c.id, requestId: randomUUID(), action: 'reschedule', followupId: f.id, dueAt: new Date(Date.now() + 259200000).toISOString(), timezone: 'America/New_York' });
+    assert.equal(unchanged.title, input.title); assert.equal(unchanged.questionId, loaner.id);
+    const cleared = s.service.followup({ caseId: s.c.id, requestId: randomUUID(), action: 'reschedule', followupId: f.id, questionId: null, dueAt: new Date(Date.now() + 345600000).toISOString(), timezone: 'America/New_York' });
+    assert.equal(cleared.questionId, null); assert.equal(s.store.get<Followup>('followup', f.id, s.c.id).title, input.title);
+    assert.equal(s.deliveries(), 0);
+  } finally { s.store.close(); }
+});
 test('HTML escapes imported markup, exports redact known identity', () => {
   const s = setup(); s.event('provider_silent', 'Maya contacted Test Supplier. <script>alert(1)</script> repairs@example.com CASE-TEST');
   const html = s.service.export({ caseId: s.c.id, format: 'html', redact: true }).content; assert.ok(!html.includes('<script>')); assert.ok(html.includes('&lt;script&gt;'));

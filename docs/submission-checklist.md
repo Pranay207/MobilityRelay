@@ -10,11 +10,22 @@
       document its role and consult the current eligibility rules. Code alone is
       not a substitute for a demonstrated integration.
 
-Local checks on 2026-10-11: 38 backend tests, eight desktop/mobile browser tests,
+Local checks on 2026-10-11: 39 backend tests, ten desktop/mobile browser tests,
 TypeScript and the production build pass. Speech and Bedrock responses are
 simulated where needed; actual local MCP HTTP calls are exercised. These are
 developer/synthetic checks, not external email delivery, live Bedrock testing,
 speech-accuracy evaluation, or validation with users.
+
+Additional checks cover follow-up title/question edits, clearing a related
+question, and rendering saved follow-up time zones in a browser configured for
+another region. Production HTML/assets, security headers, blocked anonymous API
+access, and protected login pass an isolated loopback smoke check. This does not
+validate a public deployment, TLS termination, or real provider integrations.
+
+Synthetic loopback timing checks exercise real MCP calls with 10 and 1,000
+history entries in isolated in-memory SQLite. They are local responsiveness
+measurements, not disk-storage, browser-rendering, cloud-latency, or production
+capacity guarantees.
 
 ## Repository and Video
 

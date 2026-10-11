@@ -96,3 +96,53 @@ test('microphone denial keeps the text workflow usable', async ({ page }, info) 
   await page.getByLabel('Message to Relay').fill('What reminders are due tomorrow?'); await page.getByRole('button', { name: 'Send message', exact: true }).click();
   await expect(page.getByRole('log').getByText(/No new reminder was created/).last()).toBeVisible();
 });
+
+test.describe('follow-up editing across time zones', () => {
+  test.use({ timezoneId: 'America/New_York' });
+  test('stored time zones render correctly and rescheduling saves all reviewed details', async ({ page }, info) => {
+    await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+    const session = await (await page.request.get('/api/session')).json();
+    const headers = { 'x-relay-csrf': session.csrf };
+    const title = `Follow-up test ${info.project.name} ${Date.now()}`;
+    const created = await page.request.post('/api/cases', { headers, data: { title, person: 'Fictional timezone test', equipment: 'Chair', reference: '', category: 'Other', fictional: true } });
+    expect(created.ok()).toBe(true); const c = await created.json();
+    try {
+      for (const stage of ['parts_delayed', 'loaner_needed']) {
+        const result = await page.request.post('/api/action', { headers, data: { tool: 'record_repair_event', args: { caseId: c.id, requestId: crypto.randomUUID(), party: 'supplier', source: 'Fictional supplier', channel: 'Email', occurredAt: new Date(Date.now() - 60000).toISOString(), text: 'Fictional update for testing.', stage } } });
+        expect(result.ok()).toBe(true);
+      }
+      const brief = (await (await page.request.get(`/api/cases/${c.id}`)).json()).data;
+      const parts = brief.questions.find((q: { kind: string }) => q.kind === 'parts');
+      const loaner = brief.questions.find((q: { kind: string }) => q.kind === 'loaner');
+      const dueAt = new Date(Date.now() + 172800000).toISOString();
+      const scheduled = await page.request.post('/api/action', { headers, data: { tool: 'manage_repair_followup', args: { caseId: c.id, requestId: crypto.randomUUID(), action: 'create', title: 'Check arrival date', questionId: parts.id, dueAt, timezone: 'Asia/Kolkata' } } });
+      expect(scheduled.ok()).toBe(true); const followup = (await scheduled.json()).data;
+      await page.reload(); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+      if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open case navigation' }).click();
+      await page.getByRole('button', { name: new RegExp(title) }).click();
+      await page.getByRole('tab', { name: 'Follow-ups', exact: true }).click();
+      const expectedTime = new Date(dueAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+      await expect(page.getByText(`${expectedTime} / Asia/Kolkata`, { exact: true })).toBeVisible();
+      const nextFollowup = page.locator('.case-metrics > div').filter({ hasText: 'Next follow-up' });
+      await expect(nextFollowup).toContainText(expectedTime); await expect(nextFollowup).toContainText('Asia/Kolkata');
+      await page.getByRole('button', { name: 'Reschedule Check arrival date', exact: true }).click();
+      await page.getByLabel('Follow-up title').fill('Ask about temporary equipment');
+      await page.getByLabel('Related question').selectOption(loaner.id);
+      await page.getByRole('button', { name: 'Reschedule', exact: true }).click();
+      await expect(page.getByRole('dialog')).not.toBeVisible();
+      await expect(page.getByText('Ask about temporary equipment', { exact: true })).toBeVisible();
+      const updated = (await (await page.request.get(`/api/cases/${c.id}`)).json()).data.followups.find((f: { id: string }) => f.id === followup.id);
+      expect(updated.title).toBe('Ask about temporary equipment'); expect(updated.questionId).toBe(loaner.id); expect(updated.timezone).toBe('America/New_York');
+      expect(updated.dueAt.slice(0, 16)).toBe(dueAt.slice(0, 16));
+      await page.getByRole('button', { name: 'Reschedule Ask about temporary equipment', exact: true }).click();
+      await page.getByLabel('Related question').selectOption(''); await page.getByRole('button', { name: 'Reschedule', exact: true }).click();
+      await expect(page.getByRole('dialog')).not.toBeVisible();
+      const cleared = (await (await page.request.get(`/api/cases/${c.id}`)).json()).data.followups.find((f: { id: string }) => f.id === followup.id);
+      expect(cleared.questionId).toBeNull();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await page.screenshot({ path: `.data/screenshots/${info.project.name}-followup-timezone.png`, fullPage: true });
+    } finally {
+      const result = await page.request.delete(`/api/cases/${c.id}`, { headers, data: { confirm: title } }); expect(result.ok()).toBe(true);
+    }
+  });
+});
