@@ -9,10 +9,124 @@ async function mockSpeech(page: Page, result: { transcript?: string; error?: str
       onend: (() => void) | null = null;
       start() { setTimeout(() => { if (value.error) this.onerror?.({ error: value.error }); else this.onresult?.({ resultIndex: 0, results: [[{ transcript: value.transcript ?? '' }]] }); this.onend?.(); }, 20); }
       stop() { this.onend?.(); }
+      abort() { this.onend?.(); }
     }
     Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: TestRecognition });
   }, result);
 }
+
+async function mockVoiceLifecycle(page: Page) {
+  await page.addInitScript(() => {
+    const state = { sessions: [] as { result: ((event: { resultIndex: number; results: { transcript: string }[][] }) => void) | null; end: (() => void) | null }[], aborted: 0, spoken: [] as string[], speaking: false };
+    class TestRecognition {
+      lang = ''; continuous = false; interimResults = false;
+      onresult: ((event: { resultIndex: number; results: { transcript: string }[][] }) => void) | null = null;
+      onerror: ((event: { error: string }) => void) | null = null;
+      onend: (() => void) | null = null;
+      start() { state.sessions.push({ result: this.onresult, end: this.onend }); }
+      stop() { this.onend?.(); }
+      abort() { state.aborted++; this.onend?.(); }
+    }
+    Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: TestRecognition });
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
+      cancel() { state.speaking = false; },
+      speak(utterance: SpeechSynthesisUtterance) { state.spoken.push(utterance.text); state.speaking = true; },
+    } });
+    Object.assign(window, { voiceLifecycle: state });
+  });
+}
+
+test('voice callbacks from an interrupted request cannot change a new recording', async ({ page }, info) => {
+  await mockVoiceLifecycle(page);
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay' }).click();
+  await page.getByRole('button', { name: 'Start voice input', exact: true }).click();
+  await page.getByRole('button', { name: 'Case brief', exact: true }).click();
+  await expect(page.getByRole('log').getByText(/This is a user-maintained record/).last()).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { voiceLifecycle: { aborted: number } }).voiceLifecycle.aborted)).toBe(1);
+  await page.getByRole('button', { name: 'Start voice input', exact: true }).click();
+  await page.evaluate(() => {
+    const state = (window as unknown as { voiceLifecycle: { sessions: { result: (event: { resultIndex: number; results: { transcript: string }[][] }) => void; end: () => void }[] } }).voiceLifecycle;
+    state.sessions[0].result({ resultIndex: 0, results: [[{ transcript: 'Late text from the previous recording' }]] }); state.sessions[0].end();
+  });
+  await expect(page.getByLabel('Message to Relay')).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Stop recording', exact: true })).toBeVisible();
+  await page.evaluate(() => {
+    const state = (window as unknown as { voiceLifecycle: { sessions: { result: (event: { resultIndex: number; results: { transcript: string }[][] }) => void; end: () => void }[] } }).voiceLifecycle;
+    state.sessions[1].result({ resultIndex: 0, results: [[{ transcript: 'Current recording' }]] }); state.sessions[1].end();
+  });
+  await expect(page.getByLabel('Message to Relay')).toHaveValue('Current recording');
+  await expect(page.getByRole('button', { name: 'Start voice input', exact: true })).toBeVisible();
+});
+
+test('spoken replies are opt-in for new responses and stop at review boundaries', async ({ page }, info) => {
+  await mockVoiceLifecycle(page);
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay' }).click();
+  await page.getByRole('button', { name: 'Case brief', exact: true }).click();
+  await expect(page.getByRole('log').getByText(/This is a user-maintained record/).last()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Case brief', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Enable spoken responses', exact: true }).click();
+  expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken)).toEqual([]);
+  await page.getByRole('button', { name: 'Case brief', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Case brief', exact: true })).toBeEnabled();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken.length)).toBe(1);
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await page.getByRole('button', { name: 'Record update', exact: true }).first().click();
+  await expect(page.getByRole('dialog', { name: 'Record an update', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { speaking: boolean } }).voiceLifecycle.speaking)).toBe(false);
+  await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay' }).click();
+  expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken.length)).toBe(1);
+});
+
+test('review dialogs stop the microphone and discard queued transcripts', async ({ page }, info) => {
+  await mockVoiceLifecycle(page);
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay' }).click();
+  await page.getByRole('button', { name: 'Start voice input', exact: true }).click();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await page.getByRole('button', { name: 'Record update', exact: true }).first().click();
+  await expect(page.getByRole('dialog', { name: 'Record an update', exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { voiceLifecycle: { aborted: number } }).voiceLifecycle.aborted)).toBe(1);
+  await page.evaluate(() => {
+    const state = (window as unknown as { voiceLifecycle: { sessions: { result: (event: { resultIndex: number; results: { transcript: string }[][] }) => void; end: () => void }[] } }).voiceLifecycle;
+    state.sessions[0].result({ resultIndex: 0, results: [[{ transcript: 'Unwanted transcript from a closed recording' }]] }); state.sessions[0].end();
+  });
+  await expect(page.getByLabel('What was said?')).toHaveValue('');
+  await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay' }).click();
+  await expect(page.getByLabel('Message to Relay')).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Start voice input', exact: true })).toBeVisible();
+});
+
+test('a delayed chat response cannot overwrite another case conversation', async ({ page }, info) => {
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  const cases: { id: string; title: string; reference: string }[] = await (await page.request.get('/api/cases')).json();
+  const previous = cases.find(c => c.reference === 'DEMO-2081')!;
+  const current = cases.find(c => c.reference === 'DEMO-4015')!;
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  let started!: () => void; const waiting = new Promise<void>(resolve => { started = resolve; });
+  const marker = 'Fictional transcript belonging only to the previous case.';
+  await page.route(`**/api/cases/${previous.id}/chat`, async route => {
+    started(); await gate;
+    await route.fulfill({ json: [{ id: crypto.randomUUID(), caseId: previous.id, role: 'assistant', text: marker, createdAt: new Date().toISOString(), traces: [] }] });
+  }, { times: 1 });
+  try {
+    if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open case navigation' }).click();
+    await page.getByRole('button', { name: new RegExp(previous.title) }).click(); await waiting;
+    if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open case navigation' }).click();
+    await page.getByRole('button', { name: new RegExp(current.title) }).click();
+    await expect(page.getByRole('heading', { name: current.title, exact: true })).toBeVisible();
+    if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay' }).click();
+    const response = page.waitForResponse(r => r.url().endsWith(`/api/cases/${previous.id}/chat`));
+    release(); await (await response).finished();
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await expect(page.getByRole('heading', { name: current.title, exact: true })).toBeVisible();
+    await expect(page.getByRole('log')).not.toContainText(marker);
+    await page.screenshot({ path: `.data/screenshots/${info.project.name}-case-isolation.png`, fullPage: true });
+  } finally { release(); }
+});
 
 test('case workspace renders, stays within the viewport, and exposes evidence', async ({ page }, info) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));

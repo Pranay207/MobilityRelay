@@ -36,6 +36,12 @@ LLM. Browser speech recognition and speech synthesis are optional; text and form
 controls remain available. Browser recognition may process audio through the
 browser vendor's service. Recognition availability varies by browser.
 
+Recognition is cancelled when submitting a message, opening a review dialog,
+leaving the conversation, or hiding the browser tab. Late callbacks from an old
+recording are ignored. Spoken replies are opt-in for new responses; enabling
+speech does not replay saved conversation history. Review dialogs and tab hiding
+stop playback. Case loading discards chat responses for a previously selected case.
+
 Explicit recording commands open a review form with the original wording and
 conservative role/channel/situation suggestions. No source date is extracted or
 guessed from speech. Ambiguous fields must be reviewed, and saving requires a
@@ -117,6 +123,32 @@ cases, never send external email, and never call Bedrock.
 Bedrock response sequences and browser speech recognition are simulated in
 regression tests. These check application behavior, not real model quality,
 recognition accuracy, microphone hardware, AWS access, or provider delivery.
+
+### Manual Voice Check
+
+Use a fictional case only. Browser recognition may process audio through the
+browser vendor; do not dictate real health records during testing.
+
+1. Open a fictional case in Edge or another browser with speech recognition.
+   Start voice input and grant microphone access only if you agree to it.
+2. Say `What is the next step?`, then send the recognized text. Check the reply
+   against the case's open questions and inspect its successful MCP trace.
+3. Enable spoken responses. Existing replies should not be read aloud. Repeat
+   the question, confirm the new reply is audible, and check that muting stops it.
+4. Say `Record: the supplier said by phone that the replacement part is delayed.`
+   Review the proposed fields and report date. Nothing should be saved until
+   you explicitly review and submit the form. Cancel if the transcript is wrong.
+5. Say `Prepare a request to the supplier.` Review the draft and its cited
+   sources. In capture mode, approval must show local capture, not delivery.
+6. Say `Remind me tomorrow.` Confirm exactly one new follow-up, reload, select
+   the same case, and check that it persists with the displayed time zone.
+
+Also deny microphone permission once and confirm that typed messages still work.
+Start recording and open a review dialog (on mobile, close Relay first). Confirm
+the microphone stops and no later transcript appears in the form or composer.
+Repeat with tab hiding and case switching; check that playback stops and the new
+case does not show or speak the previous case's conversation.
+These are manual checks to perform, not claims that hardware testing has passed.
 
 ## Hosting
 

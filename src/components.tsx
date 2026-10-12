@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { X, Mic, MicOff, Send, Volume2, VolumeX, AudioLines, LoaderCircle, Terminal, FileText, Clock, Download } from 'lucide-react';
 import type { ChatMessage, Settings, ToolTrace } from '../shared/types';
 
@@ -20,31 +20,48 @@ export function Modal({ title, children, onClose, wide = false }: { title: strin
 }
 
 interface RecognitionResult { results: { [index: number]: { [index: number]: { transcript: string } } }; resultIndex: number }
-interface Recognition { lang: string; continuous: boolean; interimResults: boolean; onresult: ((event: RecognitionResult) => void) | null; onerror: ((event: { error: string }) => void) | null; onend: (() => void) | null; start(): void; stop(): void }
+interface Recognition { lang: string; continuous: boolean; interimResults: boolean; onresult: ((event: RecognitionResult) => void) | null; onerror: ((event: { error: string }) => void) | null; onend: (() => void) | null; start(): void; stop(): void; abort(): void }
 type VoiceWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
-export function Assistant({ messages, busy, settings, onSend, onError }: { messages: ChatMessage[]; busy: boolean; settings: Settings | null; onSend: (text: string, cloud: boolean) => Promise<void>; onError: (text: string) => void }) {
+const cancelSpeech = () => { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); };
+export function Assistant({ messages, busy, suspended = false, settings, onSend, onError }: { messages: ChatMessage[]; busy: boolean; suspended?: boolean; settings: Settings | null; onSend: (text: string, cloud: boolean) => Promise<void>; onError: (text: string) => void }) {
   const [text, setText] = useState(''); const [listening, setListening] = useState(false); const [sound, setSound] = useState(false); const [cloud, setCloud] = useState(false);
-  const recognition = useRef<Recognition | null>(null); const end = useRef<HTMLDivElement>(null); const lastSpoken = useRef('');
+  const recognition = useRef<Recognition | null>(null); const end = useRef<HTMLDivElement>(null); const lastSpoken = useRef(messages.at(-1)?.id ?? '');
   const Voice = (window as VoiceWindow).SpeechRecognition ?? (window as VoiceWindow).webkitSpeechRecognition;
+  const cancelVoice = useCallback(() => {
+    const voice = recognition.current; recognition.current = null;
+    if (!voice) return;
+    // Detach first: browsers may deliver queued callbacks even after cancellation.
+    voice.onresult = null; voice.onerror = null; voice.onend = null;
+    try { voice.abort(); } catch { /* The browser may already have ended this session. */ }
+  }, []);
   useEffect(() => { end.current?.scrollIntoView({ block: 'nearest' }); }, [messages.length, busy]);
+  useEffect(() => { if (busy || suspended) { cancelVoice(); setListening(false); } }, [busy, suspended, cancelVoice]);
+  useEffect(() => { if (!sound || busy || suspended || listening) cancelSpeech(); }, [sound, busy, suspended, listening]);
   useEffect(() => {
     const last = messages.at(-1);
-    if (sound && last?.role === 'assistant' && last.id !== lastSpoken.current && 'speechSynthesis' in window) {
-      speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(last.text); utterance.lang = 'en-IN'; speechSynthesis.speak(utterance); lastSpoken.current = last.id;
+    if (busy || !last || last.id === lastSpoken.current) return;
+    lastSpoken.current = last.id;
+    if (sound && !suspended && !listening && !document.hidden && last.role === 'assistant' && 'speechSynthesis' in window) {
+      cancelSpeech(); const utterance = new SpeechSynthesisUtterance(last.text); utterance.lang = 'en-IN'; window.speechSynthesis.speak(utterance);
     }
-  }, [messages, sound]);
-  useEffect(() => () => { recognition.current?.stop(); if ('speechSynthesis' in window) speechSynthesis.cancel(); }, []);
+  }, [messages, sound, busy, suspended, listening]);
+  useEffect(() => {
+    const hide = () => { if (document.hidden) { cancelVoice(); setListening(false); cancelSpeech(); } };
+    document.addEventListener('visibilitychange', hide);
+    return () => { document.removeEventListener('visibilitychange', hide); cancelVoice(); cancelSpeech(); };
+  }, [cancelVoice]);
   const toggleVoice = () => {
+    if (busy || suspended) return;
     if (listening) { recognition.current?.stop(); return; }
     if (!Voice) { onError('Voice input is unavailable in this browser. Text input remains available.'); return; }
-    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    cancelVoice(); cancelSpeech();
     const voice = new Voice(); voice.lang = 'en-IN'; voice.continuous = false; voice.interimResults = false;
-    voice.onresult = event => { const transcript = event.results[event.resultIndex][0].transcript; setText(prior => prior ? `${prior} ${transcript}` : transcript); };
-    voice.onerror = event => { setListening(false); onError(event.error === 'not-allowed' ? 'Microphone access was denied. You can use text instead.' : `Voice input stopped: ${event.error}.`); };
-    voice.onend = () => setListening(false); recognition.current = voice;
-    try { voice.start(); setListening(true); } catch { onError('The microphone could not start. Try again or use text.'); }
+    voice.onresult = event => { if (recognition.current !== voice) return; const transcript = event.results[event.resultIndex][0].transcript; setText(prior => prior ? `${prior} ${transcript}` : transcript); };
+    voice.onerror = event => { if (recognition.current !== voice) return; cancelVoice(); setListening(false); onError(event.error === 'not-allowed' ? 'Microphone access was denied. You can use text instead.' : `Voice input stopped: ${event.error}.`); };
+    voice.onend = () => { if (recognition.current !== voice) return; recognition.current = null; setListening(false); }; recognition.current = voice;
+    try { voice.start(); setListening(true); } catch { cancelVoice(); setListening(false); onError('The microphone could not start. Try again or use text.'); }
   };
-  const submit = async (value: string) => { if (!value.trim() || busy) return; const prior = text; setText(''); try { await onSend(value.trim(), cloud); } catch { setText(prior || value); } };
+  const submit = async (value: string) => { if (!value.trim() || busy || suspended) return; cancelVoice(); setListening(false); cancelSpeech(); const prior = text; setText(''); try { await onSend(value.trim(), cloud); } catch { setText(prior || value); } };
   return <aside className="assistant"><div className="assistant-heading"><div className="relay-icon"><AudioLines size={22} /></div><div><h2>Relay</h2><span>{settings?.agentMode === 'bedrock' ? 'Amazon Bedrock' : 'Local command simulator'}</span></div><IconButton label={sound ? 'Mute spoken responses' : 'Enable spoken responses'} onClick={() => { if (sound && 'speechSynthesis' in window) speechSynthesis.cancel(); setSound(!sound); }}><span>{sound ? <Volume2 size={19} /> : <VolumeX size={19} />}</span></IconButton></div>
     <div className="conversation" role="log" aria-label="Repair conversation" aria-live="polite">
       {!messages.length && <div className="assistant-empty"><AudioLines size={28} /><h3>Your repair, one next step.</h3><p>Case record connected</p></div>}

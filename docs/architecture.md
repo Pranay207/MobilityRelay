@@ -47,6 +47,21 @@ an independently verified interpretation. Ambiguous and negated stage wording
 does not get a confident suggestion. The review checkbox starts unchecked and
 is cleared after field changes; only the reviewed form calls the recording tool.
 
+## Voice Lifecycle
+
+Each mounted conversation owns its recognition session. Submission, review
+dialogs, unmounting and tab hiding detach callbacks before aborting recognition.
+Callbacks also check session identity so a queued result or end event cannot
+change a later recording. Case switching remounts the conversation; delayed chat
+loads check the currently selected case again before updating the workspace.
+
+Spoken replies start disabled and do not replay history when enabled. New replies
+may be spoken only after the request finishes and while the conversation is
+visible, not recording, and not covered by a review dialog. Muting, review,
+recording, tab hiding and unmounting cancel playback. Browser tests substitute
+recognition and synthesis callbacks; they do not validate a physical microphone,
+speaker output or browser-vendor recognition accuracy.
+
 ## Approval Boundary
 
 Drafts bind recipient, subject, body, source IDs and case version in a SHA-256
