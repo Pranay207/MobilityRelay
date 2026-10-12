@@ -31,6 +31,13 @@ SQLite foreign keys cascade whole-case deletion. Evidence is append-only within
 a case: corrections link to their predecessor. Whole-case deletion remains
 available. Records are plaintext on disk; this is not encrypted clinical storage.
 
+The overview pairs supplier and insurer paperwork reports only when both are
+cited by a current unanswered receipt question. It shows the recorded wording,
+source and date, with links to the evidence history. Superseded sources are
+excluded; corrections can replace the displayed report, and answering the
+question removes the comparison. This is a request for clarification, not a
+contradiction verdict or evidence that either party is wrong.
+
 Question generation uses explicit user-selected reported situations, not free-text
 semantic contradiction inference. Source dates establish reported chronology,
 not independently verified facts or legal deadlines. Current unresolved questions
@@ -91,6 +98,12 @@ medical/legal/privacy compliance. Bedrock and SMTP are implemented optional path
 not live-tested integrations until actual accounts are configured. A local Docker
 deployment with a persistent disk is supported by configuration; no cloud
 deployment or infrastructure provisioning has been performed.
+
+The independently built conversation is explicitly labelled as an Alexa+
+experience simulator. It calls real MCP tools through the web host, but does
+not reproduce Alexa+'s full language capabilities or satisfy native onboarding
+requirements by itself. Local command routing remains a bounded fallback;
+Bedrock mode needs an actual account and live validation.
 
 ## Primary References
 

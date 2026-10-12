@@ -7,6 +7,8 @@
 - [x] Verify npm ci, backend tests and build in a fresh GitHub clone with an empty npm cache.
 - [ ] Manually verify microphone recognition and spoken replies using fictional data.
 - [ ] Keep fictional fixtures, capture mode, and integration limits visible.
+- [x] Label the independent Alexa+ simulator and expose real MCP call traces.
+- [x] Show attributed paperwork reports with dates and links to current evidence.
 - [ ] If claiming AWS Builder, configure and actually validate the Bedrock path,
       document its role and consult the current eligibility rules. Code alone is
       not a substitute for a demonstrated integration.
@@ -49,6 +51,16 @@ and synthesis checks use controlled browser substitutes, not a live microphone
 or audible speaker test. The earlier fresh-checkout run covered commit `e2639ee`,
 not these subsequent local changes.
 
+Simulator/evidence verification on 2026-10-12 passes TypeScript, all 39 backend
+tests, the production build and all 22 desktop/mobile browser tests in one full
+run. Four new browser checks cover the explicit simulator label, real MCP brief
+traces, dated source links, corrected-report provenance and hiding the comparison
+after an answer. Desktop and mobile screenshots were inspected. An earlier run
+hit one five-second mobile UI wait timeout; its isolated rerun and this full run
+passed. These results do not establish a latency guarantee, live AWS/email
+operation, native Alexa+ compatibility, or user benefit. Fresh-checkout evidence
+above still applies to the earlier commit, not this update.
+
 ## Repository and Video
 
 - [ ] Ensure reviewer access to the private GitHub repository, or publish it with
@@ -67,6 +79,12 @@ not these subsequent local changes.
 The research supports the reality of repair delays, not the effectiveness or
 uniqueness of this app. Measure synthetic task steps/errors first; conduct
 consented user testing before claiming time savings or faster repairs.
+
+- [ ] Compare a fictional repair-coordination task using MobilityRelay against
+      ordinary notes and email. Ask participants to identify the missing receipt
+      information, prepare a supported follow-up, and hand over the case history.
+      Record task completion, errors and effort; do not present synthetic-case
+      results as evidence of shorter repairs or real wheelchair-user outcomes.
 
 [Repair-delay study](https://pubmed.ncbi.nlm.nih.gov/39427781/),
 [existing supplier repair workflow](https://www.nsm-seating.com/service-repair/).

@@ -1,6 +1,25 @@
 # MobilityRelay
 
-A voice-first repair follow-up assistant for wheelchair users and caregivers.
+An independently built simulated Alexa+ experience for wheelchair users and
+caregivers, backed by a real self-hosted MCP server over Streamable HTTP.
+
+When a supplier reports sending an estimate and an insurer reports not locating
+it, MobilityRelay keeps both attributed reports visible, asks what remains
+unanswered, and prepares a source-backed follow-up for the user to approve.
+It does not assign blame or claim to reduce repair times. The intended benefit
+is a clearer record and less administrative effort; that benefit still needs
+user validation.
+
+## Problem Evidence
+
+A study published in March 2025 surveyed 301 wheelchair users with spinal cord
+injury at nine SCI Model Systems Centers. In that sample, 14% reported none of
+their necessary repairs were completed, the median elapsed time before repair
+was 14 days, and vendor noncompletion after contact was the most common reported
+reason for incomplete repairs. These findings establish a repair-process problem,
+not that this app fixes it. They are not population estimates for all wheelchair
+users, India-specific results, or a 2026 survey.
+[Study abstract and publication details](https://pubmed.ncbi.nlm.nih.gov/39427781/).
 
 ## Run Locally
 
@@ -75,6 +94,26 @@ MCP server using Streamable HTTP and protocol version 2025-11-25 or later.
 Native Alexa+ integration is not assumed or claimed. Entrant access limitations
 and the own-simulator route are described in the
 [official FAQ](https://amazonappdev2026.devpost.com/details/faqs).
+
+The conversation pane is explicitly labelled an Alexa+ experience simulator.
+Spoken or typed requests reach our Express host, which uses the official MCP SDK
+client to initialize, list tools and call them over HTTP. Successful calls are
+visible in conversation traces; case records, drafts and follow-ups persist in
+SQLite. This is a simulation of the customer workflow, not a clone of Alexa+'s
+full language capabilities, voice, branding or device integration.
+
+### Mapping to Native Alexa+
+
+Conceptually, a native Alexa+ client would replace the web simulator/Express
+conversation host as the caller of the MCP tools. The trusted approval boundary
+would still need a user-review surface and authenticated confirmation. Actual
+onboarding also needs partner access, a remote endpoint, and the OAuth 2.1/PKCE
+and discovery metadata described in the
+[Alexa+ MCP quickstart](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-quickstart.html).
+Our bearer-token/shared-password MVP does not implement that native account
+linking or claim certification. The quickstart's sub-500 ms query target is a
+native integration requirement; our local timing checks are not proof of native
+or hosted compliance, and do not cover Bedrock generation or SMTP delivery.
 
 ## Optional Integrations
 
@@ -151,6 +190,11 @@ case does not show or speak the previous case's conversation.
 These are manual checks to perform, not claims that hardware testing has passed.
 
 ## Hosting
+
+Hosting is optional for the Alexa+ hackathon path: the
+[official FAQ](https://amazonappdev2026.devpost.com/details/faqs) accepts a locally
+runnable repository and functioning demo video. A public deployment could make
+review easier, but is not live yet and must use fictional data only for this MVP.
 
 `Dockerfile` builds a single-instance deployment with a persistent `/data`
 volume. Production/public binding refuses to start without an `APP_PASSWORD`

@@ -128,6 +128,69 @@ test('a delayed chat response cannot overwrite another case conversation', async
   } finally { release(); }
 });
 
+test('simulator framing and paired reports expose source dates and real MCP calls', async ({ page }, info) => {
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  const reports = page.getByRole('region', { name: 'Reported paperwork sources', exact: true });
+  await expect(reports).toBeVisible(); await expect(reports.getByText('Receipt question open', { exact: true })).toBeVisible();
+  await expect(reports.getByText('Supplier report', { exact: true })).toBeVisible(); await expect(reports.getByText('Insurer report', { exact: true })).toBeVisible();
+  await expect(reports).toContainText('We submitted the repair estimate to your insurer.');
+  await expect(reports).toContainText('We cannot locate the repair estimate under this reference.');
+  await expect(reports.locator('time')).toHaveCount(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: `.data/screenshots/${info.project.name}-simulator-evidence.png`, fullPage: true });
+  await reports.getByRole('button', { name: 'View insurer source', exact: true }).click();
+  await expect(page.getByRole('tab', { name: 'Evidence', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.evidence.highlighted')).toContainText('Harbor Health - email');
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay' }).click();
+  const assistant = page.getByRole('complementary', { name: 'Simulated Alexa+ repair conversation', exact: true });
+  await expect(assistant.getByText('Alexa+ experience simulator', { exact: true })).toBeVisible();
+  await expect(assistant.getByText('Local command simulator', { exact: true })).toBeVisible();
+  await assistant.getByRole('button', { name: 'Case brief', exact: true }).click();
+  await expect(assistant.getByRole('button', { name: 'Case brief', exact: true })).toBeEnabled();
+  const trace = assistant.getByRole('log').locator('details').last(); await trace.locator('summary').click();
+  await expect(trace).toContainText('get_repair_brief'); await expect(trace).not.toContainText('Failed');
+  await page.screenshot({ path: `.data/screenshots/${info.project.name}-simulator-trace.png`, fullPage: true });
+});
+
+test('paired reports use corrected evidence and disappear when the question is answered', async ({ page }, info) => {
+  test.setTimeout(60000);
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  const session = await (await page.request.get('/api/session')).json(); const headers = { 'x-relay-csrf': session.csrf };
+  const title = `Report provenance test ${info.project.name} ${Date.now()}`;
+  const created = await page.request.post('/api/cases', { headers, data: { title, person: 'Fictional test user', equipment: 'Test chair', reference: '', category: 'Paperwork clarification', fictional: true } });
+  expect(created.ok()).toBe(true); const c = await created.json();
+  try {
+    for (const event of [
+      { party: 'supplier', stage: 'paperwork_sent', source: 'Fictional supplier', text: 'The fictional estimate was submitted to the insurer.' },
+      { party: 'insurer', stage: 'paperwork_requested', source: 'Fictional insurer', text: 'Original fictional report: we cannot locate the estimate.' },
+    ]) {
+      const result = await page.request.post('/api/action', { headers, data: { tool: 'record_repair_event', args: { ...event, caseId: c.id, requestId: crypto.randomUUID(), channel: 'Email', occurredAt: new Date(Date.now() - 60000).toISOString() } } }); expect(result.ok()).toBe(true);
+    }
+    await page.reload(); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+    if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open case navigation' }).click();
+    await page.getByRole('button', { name: new RegExp(title) }).click(); await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    const reports = page.getByRole('region', { name: 'Reported paperwork sources', exact: true });
+    await expect(reports).toContainText('Original fictional report: we cannot locate the estimate.');
+    await reports.getByRole('button', { name: 'View insurer source', exact: true }).click();
+    await page.locator('.evidence.highlighted').getByRole('button', { name: 'Correct source', exact: true }).click();
+    await page.getByLabel('What was said?').fill('Corrected fictional report: please confirm the submission reference.');
+    await page.getByLabel('I reviewed the source, date, and reported situation.').check(); await page.getByRole('button', { name: 'Save correction', exact: true }).click();
+    await expect(page.getByRole('dialog')).not.toBeVisible(); await page.getByRole('tab', { name: 'Overview', exact: true }).click();
+    await expect(reports).toContainText('Corrected fictional report: please confirm the submission reference.');
+    await expect(reports).not.toContainText('Original fictional report:');
+    await page.getByRole('tab', { name: 'Evidence', exact: true }).click();
+    await expect(page.locator('.evidence.superseded')).toContainText('Original fictional report:');
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
+    await page.getByRole('button', { name: 'Record answer', exact: true }).click();
+    await page.getByLabel('Answer, source, and date').fill('Fictional insurer email, recorded today: receipt is confirmed under test reference.');
+    await page.getByRole('dialog').getByRole('button', { name: 'Record answer', exact: true }).click();
+    await expect(page.getByRole('dialog')).not.toBeVisible(); await expect(reports).not.toBeVisible();
+    await expect(page.getByText('No open questions recorded', { exact: true })).toBeVisible();
+  } finally {
+    const result = await page.request.delete(`/api/cases/${c.id}`, { headers, data: { confirm: title } }); expect(result.ok()).toBe(true);
+  }
+});
+
 test('case workspace renders, stays within the viewport, and exposes evidence', async ({ page }, info) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();

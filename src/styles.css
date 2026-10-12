@@ -85,6 +85,16 @@ h1, h2, h3, p { margin-top: 0; }
 .section-title h2, .answered h2 { font-size: 14px; font-weight: 600; margin: 0; }
 .section-title h2 span { margin-left: 6px; color: #91a297; font-size: 11px; font-weight: 400; }
 .section-title > span { font-size: 10px; color: #87958b; }
+.reported-sources { border-bottom: 1px solid var(--line); margin-bottom: 26px; padding-bottom: 20px; }
+.reported-sources .section-title { flex-wrap: wrap; }
+.reported-source-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 22px; }
+.reported-source-grid article { min-width: 0; }
+.reported-source-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 12px; }
+.reported-source-heading time { font-size: 10px; color: var(--muted); }
+.reported-source-name { margin: 7px 0; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.reported-source-grid blockquote { margin: 0; font-size: 13px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.reported-source-grid .text-button { margin-top: 8px; }
+@media (max-width: 760px) { .reported-source-grid { grid-template-columns: minmax(0,1fr); gap: 16px; } .reported-source-grid article + article { padding-top: 16px; border-top: 1px solid var(--line); } }
 .question-item { display: flex; gap: 13px; background: #fff; border: 1px solid #e0e7e1; border-radius: 6px; padding: 18px 17px 14px; margin-bottom: 12px; }
 .question-number { font: 11px ui-monospace, Consolas, monospace; color: #7e9a87; flex: 0 0 22px; padding-top: 3px; }
 .question-item > div { min-width: 0; flex: 1; }
@@ -127,6 +137,7 @@ h1, h2, h3, p { margin-top: 0; }
 .assistant-heading > div:nth-child(2) { flex: 1; min-width: 0; }
 .assistant-heading h2 { font-size: 14px; font-weight: 650; margin-bottom: 4px; }
 .assistant-heading span { font-size: 9px; color: #8d998f; }
+.assistant-heading .simulator-label { display: block; font-size: 11px; line-height: 1.5; color: #586c60; margin-bottom: 3px; overflow-wrap: anywhere; }
 .conversation { overflow-y: auto; flex: 1; padding: 16px; min-height: 180px; }
 .assistant-empty { text-align: center; padding: 64px 12px 20px; color: #a2b4a9; }
 .assistant-empty h3 { font-size: 15px; color: #587460; font-weight: 500; margin: 17px 0 8px; }
