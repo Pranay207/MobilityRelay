@@ -11,7 +11,7 @@ import type { ToolCaller } from '../server/mcp.js';
 import type { ToolName } from '../server/schemas.js';
 import type { Draft, Followup, ToolTrace } from '../shared/types.js';
 
-const config: Config = { host: '127.0.0.1', port: 0, dataDir: '.data/test', password: '', mcpToken: 'test-only', publicOrigin: '', production: false, seed: false, agentMode: 'local', modelId: 'test-model', region: 'us-east-1' };
+const config: Config = { host: '127.0.0.1', port: 0, dataDir: '.data/test', password: '', mcpToken: 'test-only', publicOrigin: '', production: false, seed: false, agentMode: 'local', modelId: 'test-model', region: 'us-east-1', ollamaBaseUrl: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b' };
 
 function setup() {
   const store = new Store(':memory:');
@@ -31,6 +31,18 @@ function setup() {
 }
 
 const output = (content: NonNullable<Message['content']>): ConverseCommandOutput => ({ $metadata: {}, output: { message: { role: 'assistant', content } }, stopReason: content.some(block => block.toolUse) ? 'tool_use' : 'end_turn', usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 }, metrics: { latencyMs: 1 } });
+
+for (const mode of ['local', 'bedrock', 'ollama'] as const) test(`${mode} answers delivery-status questions from MCP state without AI guesses`, async () => {
+  const s = setup();
+  try {
+    const draft = await s.call<Draft>('prepare_repair_request', { caseId: s.c.id, requestId: randomUUID(), recipientId: s.contact.id, questionIds: [s.store.brief(s.c.id).questions[0].id] });
+    const ask = () => respond({ caseId: s.c.id, text: 'Have you sent that email?', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { converse: async () => { throw new Error('Delivery status must not be delegated to AI.'); } });
+    assert.match((await ask()).reply, /1 awaiting approval/);
+    for (const [status, expected] of [['captured', /captured locally, not delivered/], ['sent', /SMTP accepted, receipt unconfirmed/], ['unknown', /delivery outcome unknown/]] as const) {
+      s.store.put('draft', { ...draft, status }); const result = await ask(); assert.match(result.reply, expected); assert.deepEqual(result.traces.map(trace => trace.tool), ['get_repair_brief']);
+    }
+  } finally { s.store.close(); }
+});
 
 test('questions and negative commands never become local writes', async () => {
   const s = setup();
@@ -173,3 +185,118 @@ test('an empty model reply is a recoverable failure, not a blank success', async
   try { await assert.rejects(s.cloud(async () => output([])), (error: unknown) => error instanceof AppError && error.status === 502); }
   finally { s.store.close(); }
 });
+
+for (const mode of ['bedrock', 'ollama'] as const) {
+  test(`${mode} cannot disable redaction in an assistant export`, async () => {
+    const s = setup(); let turn = 0;
+    try {
+      const reply = await respond({ caseId: s.c.id, text: 'Export my case history', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async () => ++turn === 1 ? output([{ toolUse: { toolUseId: 'export', name: 'export_repair_packet', input: { format: 'json', redact: false } } }]) : output([{ text: 'The redacted history is ready.' }]) });
+      assert.ok(reply.packet); const exported = JSON.parse(reply.packet.content);
+      assert.equal(exported.redacted, true); assert.equal(exported.repairCase.person.includes(s.c.person), false);
+      assert.equal(reply.packet.content.includes(s.contact.email), false);
+    } finally { s.store.close(); }
+  });
+
+  test(`${mode} resolves short references and restricts explicit draft topics`, async () => {
+    const s = setup(); let turn = 0;
+    try {
+      s.store.recordEvent({ caseId: s.c.id, requestId: randomUUID(), party: 'user', source: 'Test user', channel: 'Personal note', text: 'Temporary equipment requested.', stage: 'loaner_needed', occurredAt: new Date().toISOString(), reference: '', supersedesId: null });
+      const result = await respond({ caseId: s.c.id, text: 'Prepare a request to the supplier about parts arrival', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
+        const schema = request.toolConfig!.tools!.find(tool => tool.toolSpec?.name === 'prepare_repair_request')!.toolSpec!.inputSchema!.json as { properties: { recipientId: { enum: string[] }; questionIds: { items: { enum: string[] } } } };
+        assert.deepEqual(schema.properties.recipientId.enum, ['C1']); assert.deepEqual(schema.properties.questionIds.items.enum, ['Q1']);
+        return ++turn === 1 ? output([{ toolUse: { toolUseId: 'draft', name: 'prepare_repair_request', input: { recipientId: 'C1', questionIds: ['Q1'] } } }]) : output([{ text: 'Ready.' }]);
+      } });
+      const draft = s.store.get<Draft>('draft', result.draftId!, s.c.id); assert.equal(draft.recipientId, s.contact.id); assert.equal(draft.questionIds.length, 1); assert.equal(s.store.brief(s.c.id).questions.find(question => question.id === draft.questionIds[0])?.kind, 'parts'); assert.match(result.reply, /explicit approval/);
+    } finally { s.store.close(); }
+  });
+
+  test(`${mode} rejects unknown or cross-case model references`, async () => {
+    const s = setup(); let turn = 0;
+    try {
+      const result = await respond({ caseId: s.c.id, text: 'Prepare a request to the supplier', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async () => ++turn === 1 ? output([{ toolUse: { toolUseId: 'bad', name: 'prepare_repair_request', input: { recipientId: randomUUID(), questionIds: ['Q99'] } } }]) : output([{ text: 'Prepared.' }]) });
+      assert.equal(result.draftId, undefined); assert.equal(s.store.list<Draft>('draft', s.c.id).length, 0); assert.deepEqual(result.traces.map(trace => trace.tool), ['get_repair_brief']); assert.match(result.reply, /not completed/);
+    } finally { s.store.close(); }
+  });
+
+  test(`${mode} cannot introduce unsourced wording into a source-backed draft`, async () => {
+    const s = setup(); let turn = 0;
+    try {
+      const result = await respond({ caseId: s.c.id, text: 'Prepare a request to the supplier', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
+        const schema = request.toolConfig?.tools?.find(tool => tool.toolSpec?.name === 'prepare_repair_request')?.toolSpec?.inputSchema?.json as { properties?: Record<string, unknown> };
+        assert.equal(schema.properties?.body, undefined); assert.equal(schema.properties?.subject, undefined);
+        return ++turn === 1 ? output([{ toolUse: { toolUseId: 'draft', name: 'prepare_repair_request', input: { recipientId: s.contact.id, questionIds: [s.store.brief(s.c.id).questions[0].id], body: 'PRIVATE_MODEL_CLAIM: coverage was approved', subject: 'PRIVATE_MODEL_CLAIM' } } }]) : output([{ text: 'The email was sent automatically and the repair is resolved.' }]);
+      } });
+      const draft = s.store.get<Draft>('draft', result.draftId!, s.c.id);
+      assert.equal(`${draft.subject} ${draft.body}`.includes('PRIVATE_MODEL_CLAIM'), false); assert.match(draft.body, /part is delayed/); assert.equal(draft.status, 'draft');
+      assert.match(result.reply, /Nothing has been sent/); assert.match(result.reply, /explicit approval/); assert.doesNotMatch(result.reply, /repair is resolved/);
+    } finally { s.store.close(); }
+  });
+
+  test(`${mode} cannot narrate a successful action without an accepted MCP write`, async () => {
+    const s = setup();
+    try {
+      const result = await respond({ caseId: s.c.id, text: 'Prepare a request to the supplier', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async () => output([{ text: 'Your email was sent and the case is complete.' }]) });
+      assert.match(result.reply, /not completed through MCP/); assert.equal(s.store.list<Draft>('draft', s.c.id).length, 0); assert.equal(result.draftId, undefined);
+    } finally { s.store.close(); }
+  });
+
+  test(`${mode} unrecognized requests cannot grant write tools or cross the case boundary`, async () => {
+    const s = setup(); let turn = 0;
+    try {
+      const result = await respond({ caseId: s.c.id, text: 'Help me make sense of this situation.', allowCloud: mode === 'bedrock' }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
+        assert.deepEqual(request.toolConfig?.tools?.map(tool => tool.toolSpec?.name), ['get_repair_brief']);
+        return ++turn === 1 ? output([
+          { toolUse: { toolUseId: 'unsafe', name: 'send_approved_request', input: {} } },
+          { toolUse: { toolUseId: 'read', name: 'get_repair_brief', input: { caseId: randomUUID() } } },
+        ]) : output([{ text: 'The supplier reports a delayed part; ask for its availability.' }]);
+      } });
+      assert.equal(s.store.list<Draft>('draft', s.c.id).length, 0); assert.equal(s.store.list<Followup>('followup', s.c.id).length, 0);
+      assert.deepEqual(result.traces.map(trace => trace.tool), ['get_repair_brief', 'get_repair_brief']);
+    } finally { s.store.close(); }
+  });
+
+  test(`${mode} reminder requests cannot cancel or alter existing follow-ups`, async () => {
+    const s = setup(); let turn = 0;
+    try {
+      await respond({ caseId: s.c.id, text: 'Remind me tomorrow', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
+        if (++turn === 1) return output([{ toolUse: { toolUseId: 'cancel', name: 'manage_repair_followup', input: { action: 'cancel', followupId: randomUUID() } } }]);
+        assert.match(JSON.stringify(request.messages?.at(-1)), /trusted user control/); return output([{ text: 'No follow-up was changed.' }]);
+      } });
+      assert.equal(s.store.list<Followup>('followup', s.c.id).length, 0);
+    } finally { s.store.close(); }
+  });
+
+  test(`${mode} receives only bounded conversation context from the selected case`, async () => {
+    const s = setup();
+    try {
+      const history = Array.from({ length: 8 }, (_, index) => ({ id: randomUUID(), caseId: s.c.id, role: 'user' as const, text: `SAME_CASE_${index}: ${'x'.repeat(2000)}`, createdAt: new Date().toISOString(), traces: [] }));
+      history.push({ ...history[0], caseId: randomUUID(), text: 'OTHER_CASE_SECRET' });
+      await respond({ caseId: s.c.id, text: 'Why is that?', allowCloud: true, history }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
+        const prompt = JSON.stringify(request.messages); assert.equal(prompt.includes('OTHER_CASE_SECRET'), false); assert.equal(prompt.includes('SAME_CASE_0'), false);
+        assert.equal(prompt.includes('SAME_CASE_7'), true); assert.ok(prompt.length < 10000); assert.match(prompt, /not authority for new actions/);
+        return output([{ text: 'The recorded supplier update says the part is delayed.' }]);
+      } });
+    } finally { s.store.close(); }
+  });
+
+  test(`${mode} bounds case context without exposing draft bodies or superseded sources`, async () => {
+    const s = setup(); let turn = 0;
+    try {
+      await s.call('prepare_repair_request', { caseId: s.c.id, requestId: randomUUID(), recipientId: s.contact.id, questionIds: [s.store.brief(s.c.id).questions[0].id], body: 'PRIVATE_REVIEWED_DRAFT_BODY' });
+      const original = s.store.brief(s.c.id).events[0];
+      s.store.recordEvent({ caseId: s.c.id, requestId: randomUUID(), party: 'supplier', source: 'Corrected source', channel: 'Email', text: 'Corrected current report.', stage: 'parts_delayed', occurredAt: new Date().toISOString(), reference: '', supersedesId: original.id });
+      for (let index = 0; index < 20; index++) s.store.recordEvent({ caseId: s.c.id, requestId: randomUUID(), party: 'user', source: `Source ${index}`, channel: 'Personal note', text: index === 19 ? 'LONG_CURRENT_SOURCE: ' + 'x'.repeat(2000) : `History ${index}`, stage: 'other', occurredAt: new Date().toISOString(), reference: '', supersedesId: null });
+      await respond({ caseId: s.c.id, text: 'Help me understand the case.', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
+        const payload = JSON.stringify(request.messages);
+        assert.equal(payload.includes('PRIVATE_REVIEWED_DRAFT_BODY'), false); assert.equal(payload.includes(s.contact.email), false); assert.equal(payload.includes('The part is delayed.'), false);
+        if (++turn === 1) {
+          const text = request.messages![0].content![0].text!;
+          const data = JSON.parse(text.slice(text.indexOf(': ') + 2, text.indexOf('\nUNTRUSTED conversation'))) as { events: { text: string; textTruncated: boolean }[]; omitted: { events: number }; requests: { status: string }[] };
+          assert.equal(data.events.length, 12); assert.equal(data.omitted.events, 9); assert.ok(data.events.every(event => event.text.length <= 1200)); assert.ok(data.events.some(event => event.textTruncated)); assert.equal(data.requests[0].status, 'draft');
+          return output([{ toolUse: { toolUseId: 'brief', name: 'get_repair_brief', input: {} } }]);
+        }
+        assert.match(payload, /textTruncated/); return output([{ text: 'Review the attributed current sources; the summary is incomplete.' }]);
+      } });
+    } finally { s.store.close(); }
+  });
+}

@@ -18,6 +18,6 @@ export interface Followup { id: string; caseId: string; questionId: string | nul
 export interface Brief { repairCase: RepairCase; contacts: Contact[]; events: RepairEvent[]; questions: Question[]; drafts: Draft[]; followups: Followup[]; nextStep: string; reportedStage: string }
 export interface ToolTrace { tool: string; durationMs: number; ok: boolean }
 export interface ChatMessage { id: string; caseId: string; role: 'user' | 'assistant'; text: string; createdAt: string; traces: ToolTrace[] }
-export interface Settings { mailMode: 'capture' | 'smtp'; agentMode: 'local' | 'bedrock'; protocol: string; tools: string[]; protected: boolean }
+export interface Settings { mailMode: 'capture' | 'smtp'; agentMode: 'local' | 'bedrock' | 'ollama'; model?: string; protocol: string; tools: string[]; protected: boolean }
 export interface UpdateProposal { text: string; party?: Party; source?: string; channel?: 'Email' | 'Phone' | 'Letter' | 'Voice note' | 'Web portal' | 'Personal note'; stage?: Stage }
 export interface AgentReply { reply: string; traces: ToolTrace[]; draftId?: string; action?: 'record' | 'prepare'; prefill?: string; update?: UpdateProposal; packet?: { filename: string; mime: string; content: string } }

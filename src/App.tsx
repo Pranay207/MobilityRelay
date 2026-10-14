@@ -3,7 +3,7 @@ import { Accessibility, ArrowUpRight, AudioLines, CalendarClock, Check, CheckCir
 import type { AgentReply, Brief, ChatMessage, Contact, Draft, Followup, Question, RepairCase, RepairEvent, Settings, ToolTrace, UpdateProposal } from '../shared/types';
 import { stageLabels } from '../shared/types';
 import { api, action, download, post, setCsrf } from './api';
-import { Assistant, IconButton, Modal, Traces, FeedbackContext } from './components';
+import { Assistant, IconButton, Modal, Traces, FeedbackContext, agentLabel } from './components';
 import { AnswerForm, CaseForm, ContactForm, EventForm, ExportForm, FollowupForm, PrepareForm, RequestForm, DeleteForm } from './forms';
 
 type Tab = 'Overview' | 'Evidence' | 'Requests' | 'Follow-ups' | 'Contacts';
@@ -46,13 +46,19 @@ export default function App() {
   const run = async (fn: () => Promise<void>) => { setBusy(true); setError(''); try { await fn(); await refresh(); } catch (err) { setError(err instanceof Error ? err.message : 'Action failed.'); await refresh().catch(() => {}); } finally { setBusy(false); } };
   const call = async <T,>(tool: string, args: unknown): Promise<T> => { const result = await action<T>(tool, args); addTraces(result.traces); return result.data; };
   const sendChat = async (text: string, allowCloud: boolean) => {
+    const caseId = selected;
     setBusy(true); setError('');
     try {
-      const result = await post<AgentReply>('/api/agent', { caseId: selected, text, allowCloud }); addTraces(result.traces);
-      await refresh();
+      const result = await post<AgentReply>('/api/agent', { caseId, text, allowCloud }); addTraces(result.traces);
+      const readOnly = !result.action && !result.draftId && result.traces.length > 0 && result.traces.every(trace => trace.ok && ['get_repair_brief', 'export_repair_packet'].includes(trace.tool));
+      if (readOnly) {
+        // The verified read did not change case data; only conversation history changed.
+        const chat = await api<ChatMessage[]>(`/api/cases/${caseId}/chat`);
+        if (selectedRef.current === caseId) setMessages(chat);
+      } else await refresh(caseId);
       if (result.action === 'record') { setRelayOpen(false); setDialog({ type: 'event', prefill: result.prefill, proposal: result.update }); }
       if (result.action === 'prepare') { setRelayOpen(false); setDialog({ type: 'prepare' }); }
-      if (result.draftId) { const current = await api<{ data: Brief }>(`/api/cases/${selected}`); const draft = current.data.drafts.find(d => d.id === result.draftId); if (draft) { setRelayOpen(false); setDialog({ type: 'request', draft }); } }
+      if (result.draftId) { const current = await api<{ data: Brief }>(`/api/cases/${caseId}`); const draft = current.data.drafts.find(d => d.id === result.draftId); if (draft) { setRelayOpen(false); setDialog({ type: 'request', draft }); } }
       if (result.packet) { download(result.packet); setNotice('Redacted case packet downloaded.'); }
     } catch (err) { setError(err instanceof Error ? err.message : 'Request failed.'); await refresh().catch(() => {}); throw err; } finally { setBusy(false); }
   };
@@ -94,7 +100,7 @@ export default function App() {
     {brief && dialog?.type === 'answer' && <Modal title="Record an answer" onClose={close}><AnswerForm question={dialog.question} busy={busy} onSubmit={answer => void run(async () => { await post(`/api/questions/${dialog.question.id}/answer`, { caseId: selected, answer }); setDialog(null); })} /></Modal>}
     {brief && dialog?.type === 'export' && <Modal title="Export case history" onClose={close}><ExportForm busy={busy} onSubmit={(format, redact) => void run(async () => { const packet = await call<{ content: string; mime: string; filename: string }>('export_repair_packet', { caseId: selected, format, redact }); download(packet); setDialog(null); setNotice('Case history downloaded. Review before sharing.'); })} /></Modal>}
     {brief && dialog?.type === 'delete' && <Modal title="Delete this case" onClose={close}><DeleteForm title={brief.repairCase.title} busy={busy} onSubmit={confirm => void run(async () => { await api(`/api/cases/${selected}`, { method: 'DELETE', body: JSON.stringify({ confirm }) }); setDialog(null); setSelected(''); setNotice('Case and its stored records deleted.'); })} /></Modal>}
-    {dialog?.type === 'settings' && <Modal title="Workspace settings" onClose={close} wide><div className="settings-content"><dl><div><dt>Assistant</dt><dd>{settings?.agentMode === 'bedrock' ? 'Amazon Bedrock' : 'Local deterministic simulator'}</dd></div><div><dt>Email</dt><dd>{settings?.mailMode === 'smtp' ? 'SMTP configured' : 'Local capture - not delivered'}</dd></div><div><dt>Transport</dt><dd>Streamable HTTP / {settings?.protocol}</dd></div><div><dt>Access</dt><dd>{settings?.protected ? 'Shared password workspace' : 'Localhost only / no password'}</dd></div></dl><h3>Recent MCP calls</h3><Traces traces={traces} />{settings?.protected && <button className="secondary" disabled={busy} onClick={() => void run(async () => { await post('/api/logout', {}); setCsrf(''); setAuthenticated(false); setDialog(null); setBrief(null); setSelected(''); })}>Sign out</button>}</div></Modal>}
+    {dialog?.type === 'settings' && <Modal title="Workspace settings" onClose={close} wide><div className="settings-content"><dl><div><dt>Assistant</dt><dd>{agentLabel(settings)}</dd></div><div><dt>Email</dt><dd>{settings?.mailMode === 'smtp' ? 'SMTP configured' : 'Local capture - not delivered'}</dd></div><div><dt>Transport</dt><dd>Streamable HTTP / {settings?.protocol}</dd></div><div><dt>Access</dt><dd>{settings?.protected ? 'Shared password workspace' : 'Localhost only / no password'}</dd></div></dl><h3>Recent MCP calls</h3><Traces traces={traces} />{settings?.protected && <button className="secondary" disabled={busy} onClick={() => void run(async () => { await post('/api/logout', {}); setCsrf(''); setAuthenticated(false); setDialog(null); setBrief(null); setSelected(''); })}>Sign out</button>}</div></Modal>}
     {mobile && brief && relayOpen && <Modal title="Relay conversation" onClose={() => setRelayOpen(false)}><Assistant key={selected} messages={messages} busy={busy} settings={settings} onSend={sendChat} onError={setError} /></Modal>}
   </div></FeedbackContext.Provider>;
 }

@@ -152,6 +152,20 @@ test('simulator framing and paired reports expose source dates and real MCP call
   await page.screenshot({ path: `.data/screenshots/${info.project.name}-simulator-trace.png`, fullPage: true });
 });
 
+test('Ollama provider label fits the workspace and does not request Bedrock consent', async ({ page }, info) => {
+  await page.route('**/api/settings', async route => { const result = await route.fetch(); await route.fulfill({ response: result, json: { ...await result.json(), agentMode: 'ollama', model: 'fixture/local-tool-model:4b' } }); });
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay' }).click();
+  const assistant = page.getByRole('complementary', { name: 'Simulated Alexa+ repair conversation', exact: true });
+  await expect(assistant.getByText('Ollama / fixture/local-tool-model:4b', { exact: true })).toBeVisible();
+  await expect(assistant.getByText('Share this case text with Amazon Bedrock', { exact: true })).toHaveCount(0);
+  expect(await assistant.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: `.data/screenshots/${info.project.name}-ollama-label-fixture.png`, fullPage: true });
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await page.getByRole('banner').getByRole('button', { name: 'Workspace settings', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Workspace settings' })).toContainText('Ollama / fixture/local-tool-model:4b');
+});
+
 test('paired reports use corrected evidence and disappear when the question is answered', async ({ page }, info) => {
   test.setTimeout(60000);
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();

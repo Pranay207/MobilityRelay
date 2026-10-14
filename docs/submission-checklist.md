@@ -2,6 +2,13 @@
 
 ## Technical Evidence
 
+The latest local security, accessibility and end-to-end results, reproduced bugs
+and remaining manual checks are in [QA report: 2026-10-14](qa-report-2026-10-14.md).
+Final local QA passes 84 backend tests, all 34 desktop/mobile browser tests,
+TypeScript and the production build. The final six-scenario actual Ollama/MCP
+run and actual AI browser check also pass with isolated fictional data. These
+are not native Alexa+, live AWS/SMTP, hardware-speech or impact validation.
+
 - [x] Run type checks, domain and wire tests, production build and browser tests.
 - [x] Record real MCP initialization, tools/list and tools/call behavior in automated tests.
 - [x] Verify npm ci, backend tests and build in a fresh GitHub clone with an empty npm cache.
@@ -62,6 +69,15 @@ operation, native Alexa+ compatibility, or user benefit. Fresh-checkout evidence
 above still applies to the earlier commit, not this update.
 
 ## Repository and Video
+
+Current criteria evidence and remaining gates are in
+[`judging-evidence.md`](judging-evidence.md). On 2026-10-13, TypeScript, 66 backend
+tests, the build and all 24 desktop/mobile browser tests pass with a fresh
+fictional database. Optional Ollama inference calls real local AI without an AWS
+account. The actual six-step local-model verification and a desktop/mobile AI
+browser check pass with isolated fictional data; slow CPU inference must still
+be disclosed. They do not establish general model accuracy. SMTP, physical speech testing and
+validation with unfamiliar users remain unverified.
 
 - [ ] Ensure reviewer access to the private GitHub repository, or publish it with
       the included MIT license. Do not expose credentials or real case records.

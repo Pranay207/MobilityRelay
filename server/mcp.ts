@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { Agent } from 'undici';
 import { toolSchemas, toolDescriptions, type ToolName } from './schemas.js';
 import type { RepairService } from './service.js';
 import { AppError } from './store.js';
@@ -27,19 +28,38 @@ export function createMcpServer(service: RepairService) {
 }
 
 export type ToolCaller = <T>(name: ToolName, args: Record<string, unknown>, traces?: ToolTrace[]) => Promise<T>;
-export async function mcpCatalog(endpoint: string, token: string) {
-  const client = new Client({ name: 'mobilityrelay-catalog', version: '0.1.0' });
-  try {
-    await client.connect(new StreamableHTTPClientTransport(new URL(endpoint), { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
-    return (await client.listTools()).tools;
-  } finally { await client.close().catch(() => {}); }
+function transport(endpoint: string, token: string, timeoutMs: number) {
+  const url = new URL(endpoint);
+  const dispatcher = new Agent({ connections: 1, pipelining: 0 });
+  const deadline = AbortSignal.timeout(timeoutMs);
+  const connection = new StreamableHTTPClientTransport(url, {
+    requestInit: { headers: { Authorization: `Bearer ${token}`, Connection: 'close' } },
+    // The SDK supplies its own abort signal, so combine it in the fetch adapter.
+    fetch: (input, init) => {
+      const options: RequestInit & { dispatcher: Agent } = { ...init, dispatcher, signal: AbortSignal.any([deadline, ...(init?.signal ? [init.signal] : [])]) };
+      return fetch(input, options);
+    },
+  });
+  return { connection, dispatcher };
 }
-export function mcpCaller(endpoint: () => string, token: string): ToolCaller {
+export async function mcpCatalog(endpoint: string, token: string, timeoutMs = 30000) {
+  const client = new Client({ name: 'mobilityrelay-catalog', version: '0.1.0' });
+  let http: ReturnType<typeof transport> | undefined;
+  try {
+    http = transport(endpoint, token, timeoutMs);
+    await client.connect(http.connection);
+    return (await client.listTools()).tools;
+  } finally { await client.close().catch(() => {}); await http?.dispatcher.destroy().catch(() => {}); }
+}
+export function mcpCaller(endpoint: () => string, token: string, timeoutMs = 30000): ToolCaller {
   return async <T>(name: ToolName, args: Record<string, unknown>, traces: ToolTrace[] = []) => {
     const started = performance.now(); let ok = false;
     const client = new Client({ name: 'mobilityrelay-web-host', version: '0.1.0' });
+    let http: ReturnType<typeof transport> | undefined;
     try {
-      await client.connect(new StreamableHTTPClientTransport(new URL(endpoint()), { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
+      // Each host client is short-lived; avoid reusing pooled sockets across clients.
+      http = transport(endpoint(), token, timeoutMs);
+      await client.connect(http.connection);
       await client.listTools();
       const result = await client.callTool({ name, arguments: args });
       const raw = result.content as { type: string; text?: string }[];
@@ -52,6 +72,7 @@ export function mcpCaller(endpoint: () => string, token: string): ToolCaller {
     } finally {
       traces.push({ tool: name, durationMs: Math.round(performance.now() - started), ok });
       await client.close().catch(() => {});
+      await http?.dispatcher.destroy().catch(() => {});
     }
   };
 }

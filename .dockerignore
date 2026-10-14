@@ -3,6 +3,16 @@ dist
 .git
 .data
 .private
+.aws
+.codex
+.agents
+**/*.sqlite*
+**/*.db
+**/*.db-*
+**/*.eml
+**/*.msg
+.npmrc
+.yarnrc.yml
 .env
 .env.*
 test-results

@@ -120,6 +120,54 @@ or hosted compliance, and do not cover Bedrock generation or SMTP delivery.
 Copy the example configuration to your local `.env` using your editor, or set
 environment variables in your shell. Never commit credentials.
 
+### Local AI Without an AWS Account
+
+Install [Ollama](https://ollama.com/) separately, then run:
+
+```sh
+ollama pull qwen2.5:1.5b
+npm run dev:ollama
+```
+
+Open http://127.0.0.1:4318. This demo uses a separate fictional database in
+`.data/ollama-demo` and always captures email locally; it never delivers it.
+For the normal server, set `AGENT_MODE=ollama`,
+`OLLAMA_BASE_URL=http://127.0.0.1:11434`, and `OLLAMA_MODEL=qwen2.5:1.5b`.
+The adapter accepts loopback HTTP only and rejects cloud-tagged model names.
+Model weights are downloaded separately and carry their own license.
+
+The model calls discovered MCP tools through the same bounded host as Bedrock.
+It receives a short, same-case conversation history, not authority to record
+evidence or send messages. Prepared message content comes from the repair
+service's attributed sources, not unrestricted model-generated claims.
+Reminder creation cannot turn into cancellation or editing by the model.
+Contact/question references are short and case-scoped; the host resolves them to
+real IDs and restricts explicit draft topics. Confirmations and direct sending-status
+questions use actual MCP state rather than model guesses.
+Natural-language replies can still be wrong. Speed and quality depend on the
+model and hardware; a successful test is not a general accuracy guarantee.
+Local model inference does not make browser speech recognition private:
+recognition may still use the browser vendor's service.
+
+```sh
+npm run test:ollama
+npm run test:ollama:ui
+```
+
+This opt-in check calls the actual running local model, the real HTTP MCP tools,
+and an isolated fictional in-memory database. Its ignored report is written to
+`.data/verification/ollama-live.json`. It does not deliver email or validate
+user benefit. Normal regression tests do not require a model download.
+The UI check additionally uses installed Edge and an isolated fictional server
+to verify real AI draft review and mobile conversation persistence; it never
+approves or sends a message. Both checks also pass on 2026-10-14 after QA fixes.
+The final CPU run took roughly 22 seconds to explain, 31 to draft and 21 to
+export; the separate browser draft took 16 seconds. Earlier runs reached
+47-55 seconds. This is not real-time voice latency or a speed guarantee.
+See `docs/judging-evidence.md` for failures, mitigations and evidence limits.
+
+### Email and Amazon Bedrock
+
 - Email: `MAIL_MODE=capture` is the default. Approval captures the exact message
   locally; **nothing is delivered**. For actual delivery, configure
   `MAIL_MODE=smtp`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, and SMTP credentials.
@@ -137,7 +185,7 @@ environment variables in your shell. Never commit credentials.
   token when none is set. A token is not permission to send: external messages
   require a separate short-lived approval issued by the user-session host.
 
-Cloud tools are restricted by the recognized request: reading, preparing a draft,
+Model tools are restricted by the recognized request: reading, preparing a draft,
 managing a follow-up, or exporting. Unrecognized requests are read-only. Evidence
 recording and delivery remain trusted user actions. Repeated equivalent writes
 reuse one idempotency key within a model conversation. If the model fails after
@@ -146,6 +194,9 @@ traces rather than claiming nothing happened or silently retrying.
 
 ## Verify
 
+The [2026-10-14 QA report](docs/qa-report-2026-10-14.md) records reproduced
+bugs, fixes, final test results, observed latency and unverified integrations.
+
 ```sh
 npm run typecheck
 npm test
@@ -153,14 +204,15 @@ npm run build
 npm run test:browser
 ```
 
-Browser tests expect a running app on port 4317 and Microsoft Edge. Set
-`TEST_BASE_URL` for another port; select another installed Playwright browser
-channel in `playwright.config.ts` when necessary. Screenshots and traces are
-ignored local test artifacts. Tests use isolated databases or temporary fictional
-cases, never send external email, and never call Bedrock.
+Browser tests start their own non-watching server on port 4319 with a fresh
+fictional database and stop it afterwards. Microsoft Edge must be installed.
+Set `TEST_PORT` if that port is occupied, or `TEST_BASE_URL` to explicitly test
+an existing server. Select another installed Playwright browser channel in
+`playwright.config.ts` when necessary. Screenshots and traces are ignored local
+test artifacts. Regression tests never send external email or call Bedrock.
 
-Bedrock response sequences and browser speech recognition are simulated in
-regression tests. These check application behavior, not real model quality,
+Bedrock/Ollama response sequences and browser speech recognition are simulated
+in regression tests. These check application behavior, not real model quality,
 recognition accuracy, microphone hardware, AWS access, or provider delivery.
 
 ### Manual Voice Check
@@ -218,5 +270,7 @@ encryption, access controls, operational policies, and user testing.
 ## Submission Materials
 
 See `docs/demo-script.md`, `docs/friction-log.md`, `docs/architecture.md`, and
-`docs/submission-checklist.md`. No user validation, measured repair-time savings,
+`docs/submission-checklist.md`. The four judging criteria and remaining evidence
+are mapped in `docs/judging-evidence.md`; the fictional task-testing protocol is
+in `docs/validation-protocol.md`. No user validation, measured repair-time savings,
 native Alexa+ availability, AWS bonus qualification, or win is claimed.

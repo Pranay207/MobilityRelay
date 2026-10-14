@@ -20,6 +20,15 @@ export function proposesTomorrow(input: string) {
   return /^(?:remind me|schedule (?:a )?follow[- ]?up|set (?:a )?reminder|follow[- ]?up)(?: for| on)? (?:tomorrow|(?:the )?next day)[.!?]*$/i.test(commandText(input));
 }
 
+export function requestQuestionKinds(input: string): string[] | null {
+  const patterns: [string[], RegExp][] = [
+    [['parts'], /\b(parts?|arrival)\b/i], [['loaner'], /\b(loaner|temporary)\b/i],
+    [['coverage'], /\b(coverage|refusal)\b/i], [['receipt', 'paperwork'], /\b(estimate|receipt|submission|paperwork)\b/i],
+  ];
+  const kinds = patterns.flatMap(([values, pattern]) => pattern.test(commandText(input)) ? values : []);
+  return kinds.length ? [...new Set(kinds)] : null;
+}
+
 export function proposeUpdate(input: string, brief: Brief): UpdateProposal {
   const text = commandText(input).replace(/^(?:record|log|note that|add (?:an? )?update)\s*[:,-]?\s*/i, '');
   const proposal: UpdateProposal = { text };

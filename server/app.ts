@@ -1,6 +1,7 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
+import onHeaders from 'on-headers';
 import { createServer } from 'node:http';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z, ZodError } from 'zod';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
@@ -28,8 +29,15 @@ export async function startServer(config: Config, mail: MailDelivery, options: {
   const sessions = new Map<string, { csrf: string; expires: number }>();
   const loginAttempts = new Map<string, { count: number; until: number }>();
   let localOrigin = `http://127.0.0.1:${config.port}`;
-  const origins = () => new Set([localOrigin, localOrigin.replace('127.0.0.1', 'localhost'), ...(config.publicOrigin ? [config.publicOrigin] : [])]);
+  const origins = () => new Set([localOrigin, `http://localhost:${new URL(localOrigin).port}`, ...(config.publicOrigin ? [config.publicOrigin] : [])]);
   const call = mcpCaller(() => `${localOrigin}/mcp`, config.mcpToken);
+  app.use('/mcp', (_req, res, next) => {
+    onHeaders(res, function () {
+      // Keep body framing valid even when a host normalizes MCP response headers.
+      this.removeHeader('Content-Length'); this.setHeader('Transfer-Encoding', 'chunked');
+    });
+    next();
+  });
   app.use((req, res, next) => {
     const host = req.headers.host;
     const allowedHosts = new Set([...origins()].map(value => new URL(value).host));
@@ -87,11 +95,7 @@ export async function startServer(config: Config, mail: MailDelivery, options: {
       response.headers.forEach((value, name) => res.setHeader(name, value));
       const bytes = Buffer.from(await response.arrayBuffer());
       res.statusCode = response.status;
-      // Keep HTTP framing explicit when middleware or proxies normalize response headers.
-      res.removeHeader('Content-Length');
-      res.setHeader('Transfer-Encoding', 'chunked');
-      res.write(bytes);
-      res.end();
+      res.end(bytes);
     } catch (error) { next(error); }
   });
   app.use('/api', (req, res, next) => {
@@ -104,13 +108,14 @@ export async function startServer(config: Config, mail: MailDelivery, options: {
     const token = req.headers.cookie?.split(';').map(p => p.trim()).find(p => p.startsWith('relay_session='))?.slice('relay_session='.length);
     if (token) sessions.delete(token); res.clearCookie('relay_session'); res.json({ ok: true });
   });
-  app.get('/api/settings', (_req, res) => res.json({ mailMode: mail.mode, agentMode: config.agentMode, protocol: '2025-11-25', tools: Object.keys(toolSchemas), protected: !!config.password }));
+  app.get('/api/settings', (_req, res) => res.json({ mailMode: mail.mode, agentMode: config.agentMode, model: config.agentMode === 'ollama' ? config.ollamaModel : undefined, protocol: '2025-11-25', tools: Object.keys(toolSchemas), protected: !!config.password }));
   app.get('/api/cases', (_req, res) => res.json(store.cases()));
   app.post('/api/cases', (req, res) => res.status(201).json(store.createCase(caseSchema.parse(req.body))));
   app.get('/api/cases/:id', async (req, res) => { const traces: ToolTrace[] = []; const data = await call('get_repair_brief', { caseId: uuid.parse(req.params.id) }, traces); res.json({ data, traces }); });
   app.delete('/api/cases/:id', (req, res) => {
     const id = uuid.parse(req.params.id); const c = store.case(id);
-    if (req.body.confirm !== c.title) throw new AppError('Type the exact case title to confirm deletion.');
+    const input = z.object({ confirm: z.string().min(1).max(100) }).strict().parse(req.body);
+    if (input.confirm !== c.title) throw new AppError('Type the exact case title to confirm deletion.');
     if (store.list<Draft>('draft', id).some(d => d.status === 'sending')) throw new AppError('Wait for the active delivery attempt to finish before deleting this case.', 409);
     store.deleteCase(id); res.json({ ok: true });
   });
@@ -136,8 +141,9 @@ export async function startServer(config: Config, mail: MailDelivery, options: {
     const input = z.object({ caseId: uuid, text: z.string().trim().min(1).max(4000), allowCloud: z.boolean().default(false) }).strict().parse(req.body);
     store.case(input.caseId);
     if (config.agentMode === 'bedrock' && !input.allowCloud) throw new AppError('Consent is required before sharing case text with Amazon Bedrock.', 403);
+    const history = store.list<ChatMessage>('chat', input.caseId).slice(-6);
     store.chat(input.caseId, 'user', input.text);
-    const result = await respond(input, config, call, `${localOrigin}/mcp`);
+    const result = await respond({ ...input, history }, config, call, `${localOrigin}/mcp`);
     store.chat(input.caseId, 'assistant', result.reply, result.traces); res.json(result);
   });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found.' }));
@@ -147,19 +153,30 @@ export async function startServer(config: Config, mail: MailDelivery, options: {
       app.use(express.static(resolve('dist')));
       app.get('/{*splat}', (_req, res) => res.sendFile(resolve('dist/index.html')));
     } else {
-      const { createServer: createVite } = await import('vite');
-      vite = await createVite({ server: { middlewareMode: true, hmr: { server } }, appType: 'spa' }); app.use(vite.middlewares);
+      const { createServer: createVite, normalizePath } = await import('vite');
+      const cacheKey = config.port ? createHash('sha256').update(`${config.dataDir}:${config.port}`).digest('hex').slice(0, 16) : randomBytes(6).toString('hex');
+      const cacheDir = resolve('node_modules', '.vite', `mobilityrelay-${cacheKey}`);
+      const deny = ['.env', '.env.*', '*.{crt,pem,key,p12,pfx,cer,der}', '.npmrc', '.yarnrc.yml', '**/.git/**', '**/.aws/**', '**/.private/**', '**/.data/**', `${normalizePath(resolve(config.dataDir))}/**`];
+      vite = await createVite({ cacheDir, publicDir: false, server: { middlewareMode: true, hmr: { server }, fs: { strict: true, deny } }, appType: 'spa' }); app.use(vite.middlewares);
     }
   }
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (res.headersSent) return;
+    if (error && typeof error === 'object' && 'type' in error) {
+      if (error.type === 'entity.parse.failed') return res.status(400).json({ error: 'Request body must be valid JSON.' });
+      if (error.type === 'entity.too.large') return res.status(413).json({ error: 'Request body exceeds the allowed size.' });
+    }
     if (error instanceof ZodError) return res.status(400).json({ error: error.issues.map(i => `${i.path.join('.') || 'Input'}: ${i.message}`).join('; ') });
     const status = error instanceof AppError ? error.status : 500;
-    if (status === 500) console.error('Request failed:', error instanceof Error ? error.message : 'Unknown error');
+    if (status === 500) {
+      const cause = error instanceof Error ? error.cause : undefined;
+      const code = cause && typeof cause === 'object' && 'code' in cause ? String(cause.code) : undefined;
+      console.error('Request failed:', error instanceof Error ? error.message : 'Unknown error', code ?? '');
+    }
     res.status(status).json({ error: error instanceof AppError ? error.message : 'The request failed. No successful action is assumed; refresh the case before retrying.' });
   });
   await new Promise<void>((resolveListen, reject) => { server.once('error', reject); server.listen(config.port, config.host, resolveListen); });
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('HTTP server did not bind.');
-  localOrigin = `http://127.0.0.1:${address.port}`;
+  localOrigin = `http://${address.address === '::1' ? '[::1]' : '127.0.0.1'}:${address.port}`;
   return { server, store, service, url: localOrigin, close: async () => { await vite?.close(); server.closeIdleConnections(); await new Promise<void>((done, reject) => server.close(err => err ? reject(err) : done())); store.close(); } };
 }

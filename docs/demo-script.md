@@ -8,7 +8,7 @@ minutes; show what actually works rather than slides promising future integratio
 | 0:00-0:15 | Maya's power-chair case | "MobilityRelay is a simulated Alexa+ repair assistant with a real MCP server. The supplier reports sending an estimate; the insurer reports not locating it." Show the two dated reports together, labelled fictional. |
 | 0:15-0:35 | Next-step question | "MobilityRelay does not decide who's at fault. It asks the actionable question: was the estimate received?" Show dates and source links. |
 | 0:35-1:00 | Voice/text request | Ask "Prepare a request to the supplier." Show the actual MCP trace and source-backed draft. If voice recognition is unavailable, openly use text. |
-| 1:00-1:25 | Approval | Show the disabled send button before approval. Review recipient and wording. In local mode say "This is a local capture, not an email delivery." Show that unanswered questions remain open. Use real SMTP only after a controlled live test. |
+| 1:00-1:25 | Approval | Show the disabled send button before approval. Review recipient and wording. In capture mode say "This is a local capture, not an email delivery." Show that unanswered questions remain open. Use real SMTP only after a controlled live test. |
 | 1:25-1:45 | Follow-up | Ask "Remind me tomorrow." Show the saved due item, then reload to demonstrate persistence. No autonomous message is promised. |
 | 1:45-2:10 | Difficult case | Switch to coverage refusal or unavailable technicians. Show a request for a written reason or professional arrangements, not a diagnosis or promised approval. |
 | 2:10-2:30 | Case packet | Export the unanswered-request history with redaction. Open the HTML file; show source dates and unresolved questions. |
@@ -28,3 +28,9 @@ Public hosting is optional under the
 [hackathon FAQ](https://amazonappdev2026.devpost.com/details/faqs). A live AWS or
 test-inbox segment belongs in the video only after the integration has actually
 passed a controlled test. Retain capture/local labels if it has not.
+
+For the actual local-AI segment, use `npm run dev:ollama` and show the
+`Ollama / qwen2.5:1.5b` badge. Warm the model before recording, then measure the
+end-to-end request. CPU latency may not fit this schedule: if a wait is edited
+out, disclose the edit and do not imply real-time speed. Keep the final published
+video under three minutes and show a successful MCP trace, not only model text.

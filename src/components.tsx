@@ -13,8 +13,18 @@ export function Modal({ title, children, onClose, wide = false }: { title: strin
   useEffect(() => {
     const el = dialog.current!; const previous = document.activeElement as HTMLElement | null;
     el.showModal(); const cancel = (e: Event) => { e.preventDefault(); close.current(); };
+    const wrapFocus = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const controls = [...el.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href], summary, [tabindex]')]
+        .filter(control => control.tabIndex >= 0 && !control.matches(':disabled') && control.getClientRects().length > 0);
+      const first = controls[0]; const last = controls.at(-1);
+      if (!first || !last) { event.preventDefault(); el.focus(); return; }
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
     el.addEventListener('cancel', cancel);
-    return () => { el.removeEventListener('cancel', cancel); el.close(); previous?.focus(); };
+    el.addEventListener('keydown', wrapFocus);
+    return () => { el.removeEventListener('cancel', cancel); el.removeEventListener('keydown', wrapFocus); el.close(); previous?.focus(); };
   }, []);
   return <dialog ref={dialog} className={`modal ${wide ? 'wide' : ''}`} aria-label={title} onClick={event => { if (!busy && event.target === event.currentTarget) onClose(); }}><div className="modal-header"><h2>{title}</h2><IconButton label="Close dialog" onClick={onClose} disabled={busy}><X size={20} /></IconButton></div>{error && <p className="dialog-error" role="alert">{error}</p>}{children}</dialog>;
 }
@@ -23,6 +33,7 @@ interface RecognitionResult { results: { [index: number]: { [index: number]: { t
 interface Recognition { lang: string; continuous: boolean; interimResults: boolean; onresult: ((event: RecognitionResult) => void) | null; onerror: ((event: { error: string }) => void) | null; onend: (() => void) | null; start(): void; stop(): void; abort(): void }
 type VoiceWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
 const cancelSpeech = () => { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); };
+export const agentLabel = (settings: Settings | null) => settings?.agentMode === 'bedrock' ? 'Amazon Bedrock' : settings?.agentMode === 'ollama' ? `Ollama / ${settings.model || 'local model'}` : 'Local command simulator';
 export function Assistant({ messages, busy, suspended = false, settings, onSend, onError }: { messages: ChatMessage[]; busy: boolean; suspended?: boolean; settings: Settings | null; onSend: (text: string, cloud: boolean) => Promise<void>; onError: (text: string) => void }) {
   const [text, setText] = useState(''); const [listening, setListening] = useState(false); const [sound, setSound] = useState(false); const [cloud, setCloud] = useState(false);
   const recognition = useRef<Recognition | null>(null); const end = useRef<HTMLDivElement>(null); const lastSpoken = useRef(messages.at(-1)?.id ?? '');
@@ -62,7 +73,7 @@ export function Assistant({ messages, busy, suspended = false, settings, onSend,
     try { voice.start(); setListening(true); } catch { cancelVoice(); setListening(false); onError('The microphone could not start. Try again or use text.'); }
   };
   const submit = async (value: string) => { if (!value.trim() || busy || suspended) return; cancelVoice(); setListening(false); cancelSpeech(); const prior = text; setText(''); try { await onSend(value.trim(), cloud); } catch { setText(prior || value); } };
-  return <aside className="assistant" aria-label="Simulated Alexa+ repair conversation"><div className="assistant-heading"><div className="relay-icon"><AudioLines size={22} /></div><div><h2>Relay</h2><span className="simulator-label">Alexa+ experience simulator</span><span>{settings?.agentMode === 'bedrock' ? 'Amazon Bedrock' : 'Local command simulator'}</span></div><IconButton label={sound ? 'Mute spoken responses' : 'Enable spoken responses'} onClick={() => { if (sound && 'speechSynthesis' in window) speechSynthesis.cancel(); setSound(!sound); }}><span>{sound ? <Volume2 size={19} /> : <VolumeX size={19} />}</span></IconButton></div>
+  return <aside className="assistant" aria-label="Simulated Alexa+ repair conversation"><div className="assistant-heading"><div className="relay-icon"><AudioLines size={22} /></div><div><h2>Relay</h2><span className="simulator-label">Alexa+ experience simulator</span><span>{agentLabel(settings)}</span></div><IconButton label={sound ? 'Mute spoken responses' : 'Enable spoken responses'} onClick={() => { if (sound && 'speechSynthesis' in window) speechSynthesis.cancel(); setSound(!sound); }}><span>{sound ? <Volume2 size={19} /> : <VolumeX size={19} />}</span></IconButton></div>
     <div className="conversation" role="log" aria-label="Repair conversation" aria-live="polite">
       {!messages.length && <div className="assistant-empty"><AudioLines size={28} /><h3>Your repair, one next step.</h3><p>Case record connected</p></div>}
       {messages.map(message => <div key={message.id} className={`message message-${message.role}`}><span className="message-author">{message.role === 'assistant' ? 'Relay' : 'You'}</span><p>{message.text}</p>{message.traces.length > 0 && <details className="tool-trace"><summary><Terminal size={12} /> {message.traces.length} MCP {message.traces.length === 1 ? 'call' : 'calls'}</summary>{message.traces.map((t, i) => <div key={i}><span>{t.tool}</span><span>{t.ok ? `${t.durationMs} ms` : 'Failed'}</span></div>)}</details>}</div>)}
