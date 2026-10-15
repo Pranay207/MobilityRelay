@@ -102,11 +102,11 @@ environment variables, Windows installation guidance and optional integrations.
 
 ## Verification
 
-Latest completed local QA: **October 14, 2026**.
+Latest completed local QA: **October 15, 2026**.
 
 | Check | Result |
 | --- | --- |
-| Backend tests | 84 passed |
+| Backend tests | 89 passed |
 | Desktop/mobile-emulation browser tests | 34 passed in one full run |
 | TypeScript and production build | Passed |
 | Automated accessibility | 21 scans; no detected violations in the tested views |
@@ -122,6 +122,12 @@ Browser tests require installed Microsoft Edge. Results use isolated fictional
 records; automated speech checks are simulated. They do not establish full
 accessibility conformance, general model accuracy or real-world benefit.
 See [QA evidence and limits](docs/project-guide.md#4-testing-and-latest-results).
+
+The October 15 performance fix removes repeated MCP negotiation and redundant
+AI completion calls. In the measured workload, median case reads fell from
+421 ms to 81 ms; a separate real-AI browser draft review took 13 seconds versus
+the earlier 71-second observation. These are local measurements, not a speed
+guarantee. See the guide for the before/after setup and limitations.
 
 ## Important Boundaries
 

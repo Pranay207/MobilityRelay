@@ -7,7 +7,7 @@ import { z, ZodError } from 'zod';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { Store, AppError } from './store.js';
 import { RepairService, type MailDelivery } from './service.js';
-import { createMcpServer, mcpCaller } from './mcp.js';
+import { createMcpServer, createMcpHost } from './mcp.js';
 import { caseSchema, contactSchema, toolSchemas, type ToolName } from './schemas.js';
 import { respond } from './agent.js';
 import { seedExamples } from './fixtures.js';
@@ -30,7 +30,8 @@ export async function startServer(config: Config, mail: MailDelivery, options: {
   const loginAttempts = new Map<string, { count: number; until: number }>();
   let localOrigin = `http://127.0.0.1:${config.port}`;
   const origins = () => new Set([localOrigin, `http://localhost:${new URL(localOrigin).port}`, ...(config.publicOrigin ? [config.publicOrigin] : [])]);
-  const call = mcpCaller(() => `${localOrigin}/mcp`, config.mcpToken);
+  const mcp = createMcpHost(() => `${localOrigin}/mcp`, config.mcpToken);
+  const call = mcp.call;
   app.use('/mcp', (_req, res, next) => {
     onHeaders(res, function () {
       // Keep body framing valid even when a host normalizes MCP response headers.
@@ -143,7 +144,7 @@ export async function startServer(config: Config, mail: MailDelivery, options: {
     if (config.agentMode === 'bedrock' && !input.allowCloud) throw new AppError('Consent is required before sharing case text with Amazon Bedrock.', 403);
     const history = store.list<ChatMessage>('chat', input.caseId).slice(-6);
     store.chat(input.caseId, 'user', input.text);
-    const result = await respond({ ...input, history }, config, call, `${localOrigin}/mcp`);
+    const result = await respond({ ...input, history }, config, call, `${localOrigin}/mcp`, { catalog: () => mcp.catalog() });
     store.chat(input.caseId, 'assistant', result.reply, result.traces); res.json(result);
   });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found.' }));
@@ -178,5 +179,5 @@ export async function startServer(config: Config, mail: MailDelivery, options: {
   await new Promise<void>((resolveListen, reject) => { server.once('error', reject); server.listen(config.port, config.host, resolveListen); });
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('HTTP server did not bind.');
   localOrigin = `http://${address.address === '::1' ? '[::1]' : '127.0.0.1'}:${address.port}`;
-  return { server, store, service, url: localOrigin, close: async () => { await vite?.close(); server.closeIdleConnections(); await new Promise<void>((done, reject) => server.close(err => err ? reject(err) : done())); store.close(); } };
+  return { server, store, service, mcp, url: localOrigin, close: async () => { await vite?.close(); await mcp.close(); server.closeIdleConnections(); await new Promise<void>((done, reject) => server.close(err => err ? reject(err) : done())); store.close(); } };
 }

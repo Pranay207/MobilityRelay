@@ -34,6 +34,10 @@ test('real HTTP MCP and browser-host workflows enforce permissions end to end', 
     const briefResult = await (await request(`/api/cases/${c.id}`, { headers: hostHeaders })).json(); const brief = briefResult.data as Brief;
     assert.equal(briefResult.traces[0].tool, 'get_repair_brief'); assert.equal(briefResult.traces[0].ok, true);
     assert.ok(connections.length >= 3); assert.ok(connections.every(value => value === 'close'));
+    connections.length = 0;
+    const again = await (await request(`/api/cases/${c.id}`, { headers: hostHeaders })).json();
+    assert.equal(again.data.repairCase.id, c.id);
+    assert.equal(connections.length, 1, 'A subsequent read must call the real tool without repeating initialization/discovery.');
     assert.equal((await request('/api/action', { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: '{}' })).status, 403);
     assert.equal((await request('/api/action', { method: 'POST', headers: hostHeaders, body: JSON.stringify({ tool: 'send_approved_request', args: {} }) })).status, 400);
     const draftResult = await request('/api/action', { method: 'POST', headers: hostHeaders, body: JSON.stringify({ tool: 'prepare_repair_request', args: { caseId: c.id, requestId: randomUUID(), recipientId: brief.contacts[0].id, questionIds: brief.questions.map(q => q.id) } }) });
@@ -45,6 +49,30 @@ test('real HTTP MCP and browser-host workflows enforce permissions end to end', 
     const agent = await request('/api/agent', { method: 'POST', headers: hostHeaders, body: JSON.stringify({ caseId: c.id, text: 'Remind me tomorrow' }) }); assert.equal(agent.status, 200); assert.ok((await agent.json()).traces.some((t: { tool: string }) => t.tool === 'manage_repair_followup'));
     const exportResult = await request('/api/action', { method: 'POST', headers: hostHeaders, body: JSON.stringify({ tool: 'export_repair_packet', args: { caseId: c.id, format: 'json', redact: true } }) }); assert.equal(exportResult.status, 200); assert.ok(!(await exportResult.json()).data.content.includes('Maya'));
     const chat = await (await request(`/api/cases/${c.id}/chat`, { headers: hostHeaders })).json(); assert.equal(chat.length, 2);
+  } finally { await running.close(); }
+});
+
+test('concurrent host reads share MCP discovery but never cache case data', async () => {
+  const running = await startServer(config, { mode: 'capture', send: async () => { throw new Error('Read checks must not send.'); } }, { frontend: false, database: ':memory:' });
+  const methods: string[] = [];
+  running.server.on('request', request => {
+    if (request.url !== '/mcp' || request.method !== 'POST') return;
+    let body = ''; request.on('data', chunk => { body += String(chunk); });
+    request.once('end', () => { methods.push(JSON.parse(body).method); });
+  });
+  try {
+    const repair = running.store.cases()[0];
+    const pending = Array.from({ length: 5 }, () => running.mcp.call<Brief>('get_repair_brief', { caseId: repair.id }));
+    for (const read of pending) assert.equal((await read).repairCase.id, repair.id);
+    assert.equal(methods.filter(method => method === 'initialize').length, 1);
+    assert.equal(methods.filter(method => method === 'tools/list').length, 1);
+    assert.equal(methods.filter(method => method === 'tools/call').length, 5);
+    const before = running.store.brief(repair.id).events.length;
+    await running.mcp.call('record_repair_event', { caseId: repair.id, requestId: randomUUID(), party: 'user', source: 'Fictional performance regression', channel: 'Personal note', occurredAt: new Date().toISOString(), text: 'A new attributed update.', stage: 'other', reference: '', supersedesId: null });
+    const refreshed = await running.mcp.call<Brief>('get_repair_brief', { caseId: repair.id });
+    assert.equal(refreshed.events.length, before + 1);
+    assert.equal(methods.filter(method => method === 'initialize').length, 1);
+    assert.equal(methods.filter(method => method === 'tools/list').length, 1);
   } finally { await running.close(); }
 });
 test('password sessions do not auto-login and reject invalid credentials', async () => {

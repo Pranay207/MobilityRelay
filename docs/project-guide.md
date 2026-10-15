@@ -183,14 +183,20 @@ Host/Origin checks and bearer authentication protect `/mcp`.
 - The host injects the active case, restricts requested operations and resolves short case-scoped contact/question references to real IDs.
 - The model cannot record evidence or send messages. Follow-up tools may create only, not edit or cancel existing items.
 - Source-backed draft wording comes from the repair service, not arbitrary model-written subject/body claims.
-- Context is bounded: six recent messages, up to 12 current sources, 15 open questions, ten contacts, five request statuses and eight follow-ups. Omitted counts/truncation are disclosed; this is not a complete AI case audit.
+- Read context is bounded: six recent messages, up to 12 current sources, 15 open questions, ten contacts, five request statuses and eight follow-ups. Draft selection receives only scoped contacts/questions and omitted counts, not full reports or chat history; the service still uses the actual reports to produce the reviewed message. This is not a complete AI case audit.
 - The loop allows at most five turns/eight attempted tools. Bedrock call/conversation limits are 25/45 seconds; Ollama limits are 90/150 seconds. These are bounds, not speed guarantees.
 - Equivalent writes share an idempotency key within a conversation. Provider failure does not silently switch modes or replay a write; a completed action retains its handle and trace.
-- Host confirmations and direct delivery-status answers use actual recorded state. Free-form read answers can still overclaim; general model accuracy is not established.
+- The first successful requested action immediately returns its trusted host confirmation, without another inference pass or further actions from that model batch. Direct delivery-status answers also use actual recorded state. Free-form read answers can still overclaim; general model accuracy is not established.
 
-Short-lived HTTP clients own non-pipelined Undici dispatchers, combine a
-30-second deadline with SDK cancellation, and destroy the dispatcher after use.
-There is no automatic write retry or global dispatcher replacement. Read-only
+The web host reuses one initialized MCP client and discovered tool catalog for
+its lifetime. Concurrent first reads share negotiation. Only schema metadata is
+cached: every case read still performs a real HTTP tool call and reads current
+storage. The owned Undici dispatcher keeps non-pipelined, closed HTTP connections;
+HTTP and tool-request deadlines renew for each operation. Initialization and
+discovery are separately bounded. A domain rejection preserves the healthy client;
+a transport/protocol failure invalidates it, and only a later request reconnects.
+Shutdown closes the client and dispatcher. Standalone diagnostic clients remain
+short-lived. There is no automatic write retry or global dispatcher replacement. Read-only
 replies refresh chat without a redundant case read; writes/review proposals and
 periodic synchronization still refresh case data.
 
@@ -232,7 +238,7 @@ not establish the native toolkit's sub-500 ms query target.
 
 ## 4. Testing and Latest Results
 
-**Latest completed QA: October 14, 2026.** These results apply to the tested
+**Full QA baseline: October 14, 2026.** These results apply to the tested
 implementation committed as `a6995f4`; this documentation consolidation changes
 no application code. Tests use isolated fictional records, not real health data.
 
@@ -306,6 +312,81 @@ Ignored outputs include `.data/verification/*` and `.data/screenshots/*`.
 [Vite file denial](https://vite.dev/config/server-options#server-fs-deny),
 [Node fetch dispatchers](https://nodejs.org/docs/latest/api/globals.html#fetch),
 [Undici Agent](https://github.com/nodejs/undici/blob/main/docs/docs/api/Agent.md).
+
+### User-Workflow Recheck: October 15, 2026
+
+The existing Edge tests were rerun with isolated fictional storage and local
+message capture. No external messages were sent and the running demo cases
+were not modified. This was automated workflow testing and screenshot review,
+not independent user validation or physical speech testing.
+
+| Check | Result |
+| --- | --- |
+| Actual Ollama + MCP browser workflow | Passed: a source-backed supplier draft opened for review with approval disabled; mobile conversation persisted and no uncaught page errors were reported. |
+| Actual AI draft wait | 71,192 ms from submitting the request through review verification on this host. This is too slow for a smooth voice interaction; the cause and cold/warm-start contribution are not established. |
+| Full desktop/mobile suite | 33 passed, one failed, 5.8 minutes. Desktop/mobile case lifecycle, captured-message review, follow-ups, persistence, answer recording and export passed. |
+| Failure investigation | The mobile simulated-speech test failed before speech interaction while waiting five seconds for the initial case heading. The case-detail response took about 4,691 ms; other session/settings/list requests were much faster. The later failure snapshot contained the expected case. |
+| Unchanged focused rerun | The failed mobile scenario passed in isolation; the run reported 24.6 seconds. No test timeouts were increased and no application fix was made. |
+
+**Assessment:** the tested workflow works, but this run does not establish
+consistent responsiveness. Investigate the slow AI request and intermittent
+initial case read before describing the experience as fast or fully reliable.
+The focused pass does not turn that full run into a 34/34 pass. This is the
+pre-fix observation; the changes and subsequent measurements are recorded below.
+
+### Performance Fix: October 15, 2026
+
+The pre-fix implementation initialized MCP and rediscovered its schemas for each
+tool call. It also sent full report context for simple draft selection and made
+another model call after a successful action, although the host replaced that
+reply with a fixed confirmation. The fix reuses protocol/schema metadata,
+minimizes draft-selection context and stops after the accepted action. Approval,
+source-backed service wording, fresh case reads and no automatic transport replay
+remain in place. The original browser assertions/timeouts have not been widened.
+
+The same isolated 20-read workload and actual local-model request were measured
+before and after. These are observations on one Windows host, not a controlled
+performance study, a cold-start guarantee, or native Alexa+ latency certification.
+
+| Measurement | Before | After |
+| --- | --- | --- |
+| HTTP requests to `/mcp` for 20 case reads | 100 | 24 |
+| First case read | 1,250 ms | 435 ms |
+| Median case read | 421 ms | 81 ms |
+| p95 case read in this small sample | 1,250 ms | 184 ms |
+| Actual AI draft, API benchmark | 33,378 ms; two model calls | 3,166 ms; one model call |
+| First model input in that benchmark | 1,256 tokens | 524 tokens |
+| Separate actual-AI browser draft review | Earlier user-workflow check: 71,192 ms | 13,012 ms; approval disabled, no page errors; desktop/mobile check passed |
+
+Model loading, prompt caching and machine load affect timings. The API and
+browser measurements are different runs; do not treat the faster API figure as
+a promise of browser speed. Read/explanation requests still use broader context
+and have not acquired a universal low-latency guarantee.
+
+Reproduce the benchmark with:
+
+```sh
+npx tsx scripts/verify-performance.ts current --ai
+```
+
+This uses an in-memory fictional database and refuses email delivery. Reports
+are ignored `.data/verification/performance-*.json`; they contain timing/token
+metadata and traces, not messages or credentials. Baseline reports were captured
+before changing application code. The script now uses the optimized host.
+
+The backend/type/build gate passes **89 tests**. Added regressions cover shared
+discovery, noncached case updates, single-pass action completion, reviewed draft
+grounding despite compact inference context, renewed idle deadlines, domain
+errors, transport reconnects and no replay of an ambiguous write. An early test
+fixture reproduced this host's existing chunk-framing mismatch; setting its
+fake MCP server to explicit native chunking corrected the fixture. This was not
+a new application transport failure. The subsequent full browser run passed
+**all 34 desktop/mobile tests in 2.6 minutes**, with no automatic retries or
+longer assertion timeouts. The formerly failing mobile speech/review scenario
+also passed six separate repetitions in 42.4 seconds with unchanged assertions.
+This is a finite stability check, not proof that latency cannot recur.
+Physical voice, external services and long-duration
+reliability remain separate validation work.
 
 ### Manual Voice and User Checks
 

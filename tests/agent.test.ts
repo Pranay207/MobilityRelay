@@ -136,7 +136,7 @@ test('a recognized cloud read request cannot create a model-requested reminder',
   } finally { s.store.close(); }
 });
 
-test('repeated equivalent model writes reuse one idempotency key', async () => {
+test('a model batch cannot create repeated reminders after its first successful action', async () => {
   const s = setup(); let turn = 0;
   try {
     await s.cloud(async () => {
@@ -147,20 +147,37 @@ test('repeated equivalent model writes reuse one idempotency key', async () => {
         { toolUse: { toolUseId: 'second', name: 'manage_repair_followup', input: { action: 'create', timezone: 'Asia/Kolkata', dueAt, title: 'Ask for an ETA' } } },
       ]);
     }, true, 'Remind me tomorrow');
-    assert.equal(s.store.list<Followup>('followup', s.c.id).length, 1);
+    assert.equal(s.store.list<Followup>('followup', s.c.id).length, 1); assert.equal(turn, 1);
   } finally { s.store.close(); }
 });
 
-test('cloud failure after a saved draft returns its review handle and successful trace', async () => {
+test('a saved draft returns its trusted confirmation without a second model call', async () => {
   const s = setup(); let turn = 0;
   try {
     const reply = await s.cloud(async () => {
       if (++turn > 1) throw new Error('Simulated cloud timeout');
       return output([{ toolUse: { toolUseId: 'draft', name: 'prepare_repair_request', input: { recipientId: s.contact.id, questionIds: [s.store.brief(s.c.id).questions[0].id] } } }]);
     });
-    assert.match(reply.reply, /stopped before completing/); assert.ok(reply.draftId);
+    assert.equal(turn, 1); assert.match(reply.reply, /explicit approval/); assert.ok(reply.draftId);
     assert.equal(s.store.get<Draft>('draft', reply.draftId!, s.c.id).status, 'draft');
     assert.ok(reply.traces.some(t => t.ok && t.tool === 'prepare_repair_request'));
+  } finally { s.store.close(); }
+});
+
+for (const mode of ['bedrock', 'ollama'] as const) test(`${mode} draft selection omits full reports and stops after the successful action`, async () => {
+  const s = setup(); let turns = 0;
+  try {
+    s.store.recordEvent({ caseId: s.c.id, requestId: randomUUID(), party: 'supplier', source: 'Source with private detail', channel: 'Email', text: 'PRIVATE_FULL_REPORT: the part is delayed.', stage: 'parts_delayed', occurredAt: new Date().toISOString(), reference: '', supersedesId: null });
+    const result = await respond({ caseId: s.c.id, text: 'Prepare a request to the supplier about parts arrival', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
+      turns++;
+      assert.equal(JSON.stringify(request.messages).includes('PRIVATE_FULL_REPORT'), false);
+      assert.match(JSON.stringify(request.messages), /C1/); assert.match(JSON.stringify(request.messages), /Q1/);
+      return output([{ toolUse: { toolUseId: 'draft', name: 'prepare_repair_request', input: { recipientId: 'C1', questionIds: ['Q1'] } } }]);
+    } });
+    assert.equal(turns, 1); assert.ok(result.draftId); assert.match(result.reply, /Nothing has been sent/);
+    const draft = s.store.get<Draft>('draft', result.draftId, s.c.id);
+    assert.match(draft.body, /PRIVATE_FULL_REPORT/, 'The service must still ground the reviewed draft in actual reports.');
+    assert.equal(draft.status, 'draft'); assert.equal(s.store.list<Draft>('draft', s.c.id).length, 1);
   } finally { s.store.close(); }
 });
 
