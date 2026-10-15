@@ -17,20 +17,20 @@ async function mockSpeech(page: Page, result: { transcript?: string; error?: str
 
 async function mockVoiceLifecycle(page: Page) {
   await page.addInitScript(() => {
-    const state = { sessions: [] as { result: ((event: { resultIndex: number; results: { transcript: string }[][] }) => void) | null; end: (() => void) | null }[], aborted: 0, spoken: [] as string[], speaking: false };
+    const state = { sessions: [] as { result: ((event: { resultIndex: number; results: { transcript: string }[][] }) => void) | null; end: (() => void) | null }[], languages: [] as string[], aborted: 0, spoken: [] as string[], spokenLanguages: [] as string[], speaking: false };
     class TestRecognition {
       lang = ''; continuous = false; interimResults = false;
       onresult: ((event: { resultIndex: number; results: { transcript: string }[][] }) => void) | null = null;
       onerror: ((event: { error: string }) => void) | null = null;
       onend: (() => void) | null = null;
-      start() { state.sessions.push({ result: this.onresult, end: this.onend }); }
+      start() { state.languages.push(this.lang); state.sessions.push({ result: this.onresult, end: this.onend }); }
       stop() { this.onend?.(); }
       abort() { state.aborted++; this.onend?.(); }
     }
     Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: TestRecognition });
     Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
       cancel() { state.speaking = false; },
-      speak(utterance: SpeechSynthesisUtterance) { state.spoken.push(utterance.text); state.speaking = true; },
+      speak(utterance: SpeechSynthesisUtterance) { state.spoken.push(utterance.text); state.spokenLanguages.push(utterance.lang); state.speaking = true; },
     } });
     Object.assign(window, { voiceLifecycle: state });
   });
@@ -41,6 +41,7 @@ test('voice callbacks from an interrupted request cannot change a new recording'
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
   if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay' }).click();
   await page.getByRole('button', { name: 'Start voice input', exact: true }).click();
+  expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { languages: string[] } }).voiceLifecycle.languages)).toEqual(['en-IN']);
   await page.getByRole('button', { name: 'Case brief', exact: true }).click();
   await expect(page.getByRole('log').getByText(/This is a user-maintained record/).last()).toBeVisible();
   await expect.poll(() => page.evaluate(() => (window as unknown as { voiceLifecycle: { aborted: number } }).voiceLifecycle.aborted)).toBe(1);
@@ -71,6 +72,7 @@ test('spoken replies are opt-in for new responses and stop at review boundaries'
   await page.getByRole('button', { name: 'Case brief', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Case brief', exact: true })).toBeEnabled();
   await expect.poll(() => page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken.length)).toBe(1);
+  expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spokenLanguages: string[] } }).voiceLifecycle.spokenLanguages)).toEqual(['en-IN']);
   if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
   await page.getByRole('button', { name: 'Record update', exact: true }).first().click();
   await expect(page.getByRole('dialog', { name: 'Record an update', exact: true })).toBeVisible();
@@ -127,6 +129,49 @@ test('a delayed chat response cannot overwrite another case conversation', async
     await page.screenshot({ path: `.data/screenshots/${info.project.name}-case-isolation.png`, fullPage: true });
   } finally { release(); }
 });
+
+for (const activity of ['chat reply', 'follow-up save'] as const) {
+  test(`a delayed background refresh cannot undo a newer ${activity}`, async ({ page }, info) => {
+    test.setTimeout(60000);
+    await page.clock.install();
+    const session = await (await page.request.get('/api/session')).json(); const headers = { 'x-relay-csrf': session.csrf };
+    const title = `Refresh test ${activity} ${info.project.name} ${Date.now()}`;
+    const created = await page.request.post('/api/cases', { headers, data: { title, person: 'Fictional refresh tester', equipment: 'Chair', reference: '', category: 'Other', fictional: true } });
+    expect(created.ok()).toBe(true); const repair = await created.json();
+    let release = () => {};
+    try {
+      await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+      if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open case navigation' }).click();
+      await page.getByRole('button', { name: new RegExp(title) }).click(); await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+      const chatPath = `/api/cases/${repair.id}/chat`;
+      const gate = new Promise<void>(resolve => { release = resolve; });
+      let started!: () => void; const waiting = new Promise<void>(resolve => { started = resolve; });
+      await page.route(`**${chatPath}`, async route => { const response = await route.fetch(); started(); await gate; await route.fulfill({ response }); }, { times: 1 });
+      await page.clock.fastForward(20000); await waiting;
+      if (activity === 'chat reply') {
+        if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+        await page.getByRole('button', { name: 'Case brief', exact: true }).click();
+        await expect(page.getByRole('button', { name: 'Case brief', exact: true })).toBeEnabled();
+        await expect(page.locator('.message')).toHaveCount(2);
+      } else {
+        await page.getByRole('tab', { name: 'Follow-ups', exact: true }).click();
+        await page.getByRole('button', { name: 'Schedule', exact: true }).click();
+        await page.getByLabel('Follow-up title').fill('Preserve this newly saved follow-up');
+        await page.getByRole('button', { name: 'Schedule follow-up', exact: true }).click();
+        await expect(page.getByRole('dialog')).not.toBeVisible();
+        await expect(page.getByText('Preserve this newly saved follow-up', { exact: true })).toBeVisible();
+      }
+      const response = page.waitForResponse(result => result.url().endsWith(chatPath));
+      release(); await (await response).finished();
+      await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+      if (activity === 'chat reply') await expect(page.locator('.message')).toHaveCount(2);
+      else await expect(page.getByText('Preserve this newly saved follow-up', { exact: true })).toBeVisible();
+    } finally {
+      release();
+      expect((await page.request.delete(`/api/cases/${repair.id}`, { headers, data: { confirm: title } })).ok()).toBe(true);
+    }
+  });
+}
 
 test('simulator framing and paired reports expose source dates and real MCP calls', async ({ page }, info) => {
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();

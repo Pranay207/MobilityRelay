@@ -14,6 +14,7 @@ const time = (value: string, timeZone?: string) => new Date(value).toLocaleStrin
 export default function App() {
   const [ready, setReady] = useState(false); const [authenticated, setAuthenticated] = useState(false); const [password, setPassword] = useState('');
   const [cases, setCases] = useState<RepairCase[]>([]); const [selected, setSelected] = useState(''); const selectedRef = useRef('');
+  const refreshGeneration = useRef(0);
   const [brief, setBrief] = useState<Brief | null>(null); const [messages, setMessages] = useState<ChatMessage[]>([]); const [settings, setSettings] = useState<Settings | null>(null);
   const [tab, setTab] = useState<Tab>('Overview'); const [dialog, setDialog] = useState<Dialog | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [search, setSearch] = useState(''); const [sidebar, setSidebar] = useState(false); const [highlight, setHighlight] = useState(''); const [traces, setTraces] = useState<ToolTrace[]>([]);
@@ -21,14 +22,20 @@ export default function App() {
   useEffect(() => { const media = matchMedia('(max-width: 760px)'); const change = () => setMobile(media.matches); media.addEventListener('change', change); return () => media.removeEventListener('change', change); }, []);
   selectedRef.current = selected;
   const addTraces = (next: ToolTrace[]) => setTraces(current => [...next, ...current].slice(0, 30));
-  const loadCases = async () => { const list = await api<RepairCase[]>('/api/cases'); setCases(list); return list; };
+  const loadCases = async (generation = refreshGeneration.current) => { const list = await api<RepairCase[]>('/api/cases'); if (generation === refreshGeneration.current) setCases(list); return list; };
   const refresh = async (id = selectedRef.current) => {
-    const list = await loadCases();
-    if (!id || !list.some(c => c.id === id)) { setSelected(list.find(c => c.reference === 'DEMO-1042')?.id ?? list[0]?.id ?? ''); if (!list.length) { setBrief(null); setMessages([]); } return; }
-    const result = await api<{ data: Brief; traces: ToolTrace[] }>(`/api/cases/${id}`);
-    if (selectedRef.current !== id) return;
-    const chat = await api<ChatMessage[]>(`/api/cases/${id}/chat`);
-    if (selectedRef.current === id) { setBrief(result.data); addTraces(result.traces); setMessages(chat); }
+    // A poll started before a user action must not rewind the displayed record.
+    const generation = ++refreshGeneration.current;
+    const current = () => generation === refreshGeneration.current && selectedRef.current === id;
+    try {
+      const list = await loadCases(generation);
+      if (!current()) return;
+      if (!id || !list.some(c => c.id === id)) { setSelected(list.find(c => c.reference === 'DEMO-1042')?.id ?? list[0]?.id ?? ''); if (!list.length) { setBrief(null); setMessages([]); } return; }
+      const result = await api<{ data: Brief; traces: ToolTrace[] }>(`/api/cases/${id}`);
+      if (!current()) return;
+      const chat = await api<ChatMessage[]>(`/api/cases/${id}/chat`);
+      if (current()) { setBrief(result.data); addTraces(result.traces); setMessages(chat); }
+    } catch (err) { if (current()) throw err; }
   };
   useEffect(() => { void api<{ authenticated: boolean; csrf?: string }>('/api/session').then(async result => {
     if (result.csrf) setCsrf(result.csrf); setAuthenticated(result.authenticated);
@@ -43,10 +50,10 @@ export default function App() {
     const current = brief.drafts.find(d => d.id === dialog.draft.id);
     if (current && current.status !== dialog.draft.status) setDialog({ type: 'request', draft: current });
   }, [brief, dialog]);
-  const run = async (fn: () => Promise<void>) => { setBusy(true); setError(''); try { await fn(); await refresh(); } catch (err) { setError(err instanceof Error ? err.message : 'Action failed.'); await refresh().catch(() => {}); } finally { setBusy(false); } };
+  const run = async (fn: () => Promise<void>) => { refreshGeneration.current++; setBusy(true); setError(''); try { await fn(); await refresh(); } catch (err) { setError(err instanceof Error ? err.message : 'Action failed.'); await refresh().catch(() => {}); } finally { setBusy(false); } };
   const call = async <T,>(tool: string, args: unknown): Promise<T> => { const result = await action<T>(tool, args); addTraces(result.traces); return result.data; };
   const sendChat = async (text: string, allowCloud: boolean) => {
-    const caseId = selected;
+    const caseId = selected; const generation = ++refreshGeneration.current;
     setBusy(true); setError('');
     try {
       const result = await post<AgentReply>('/api/agent', { caseId, text, allowCloud }); addTraces(result.traces);
@@ -54,7 +61,7 @@ export default function App() {
       if (readOnly) {
         // The verified read did not change case data; only conversation history changed.
         const chat = await api<ChatMessage[]>(`/api/cases/${caseId}/chat`);
-        if (selectedRef.current === caseId) setMessages(chat);
+        if (selectedRef.current === caseId && generation === refreshGeneration.current) setMessages(chat);
       } else await refresh(caseId);
       if (result.action === 'record') { setRelayOpen(false); setDialog({ type: 'event', prefill: result.prefill, proposal: result.update }); }
       if (result.action === 'prepare') { setRelayOpen(false); setDialog({ type: 'prepare' }); }
@@ -62,7 +69,7 @@ export default function App() {
       if (result.packet) { download(result.packet); setNotice('Redacted case packet downloaded.'); }
     } catch (err) { setError(err instanceof Error ? err.message : 'Request failed.'); await refresh().catch(() => {}); throw err; } finally { setBusy(false); }
   };
-  const choose = (id: string) => { if (busy) return; setSelected(id); setTab('Overview'); setSidebar(false); setDialog(null); setError(''); };
+  const choose = (id: string) => { if (busy) return; if (id !== selectedRef.current) refreshGeneration.current++; setSelected(id); setTab('Overview'); setSidebar(false); setDialog(null); setError(''); };
   const showSource = (id: string) => { setTab('Evidence'); setHighlight(id); setTimeout(() => document.getElementById(`event-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); };
   const open = brief?.questions.filter(q => !q.resolved) ?? []; const answered = brief?.questions.filter(q => q.resolved) ?? [];
   const scheduled = brief?.followups.filter(f => f.status === 'scheduled').sort((a, b) => a.dueAt.localeCompare(b.dueAt)) ?? [];

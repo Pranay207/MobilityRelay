@@ -106,13 +106,13 @@ Latest completed local QA: **October 15, 2026**.
 
 | Check | Result |
 | --- | --- |
-| Backend tests | 89 passed |
-| Desktop/mobile-emulation browser tests | 38 passed in one full run |
+| Backend tests | 95 passed |
+| Desktop/mobile-emulation browser tests | 42 passed in one full run |
 | TypeScript and production build | Passed |
 | Automated accessibility | 21 scans; no detected violations in the tested views |
-| Actual local AI + MCP | Six-scenario API workflow and desktop/mobile UI check passed |
+| Actual local AI + MCP | Seven-scenario Ollama-mode API workflow and desktop/mobile UI check passed |
 | Production Docker image | Built; isolated authentication, MCP, approval rejection and restart persistence checks passed |
-| Clean source installation | Fresh npm cache, production build and all 89 backend tests passed on this Windows host |
+| Clean source installation | Earlier fresh-cache installation passed on this Windows host; dependencies are unchanged. Latest GitHub checkout still needs verification. |
 | Dependency audit | Zero known vulnerabilities at the time of testing |
 
 ```sh
@@ -126,6 +126,12 @@ accessibility conformance, general model accuracy or real-world benefit.
 See [QA evidence and limits](docs/project-guide.md#4-testing-and-latest-results).
 The complete Docker Compose/Ollama stack and public HTTPS deployment are not
 verified; see [Docker setup](docs/project-guide.md#docker-and-local-ai).
+
+The workflow recheck fixed stale refreshes hiding new replies/follow-ups,
+made the supported tomorrow reminder deterministic across agent modes, and
+replaced generated case-status claims with structured MCP-backed summaries.
+English recognition/output settings are regression-tested; physical audio is
+still unverified. Some CPU inference requests still take roughly 30 seconds.
 
 The October 15 performance fix removes repeated MCP negotiation and redundant
 AI completion calls. In the measured workload, median case reads fell from

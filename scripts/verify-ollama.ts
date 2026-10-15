@@ -37,13 +37,17 @@ try {
   assert.equal((await mcpCatalog(`${app.url}/mcp`, config.mcpToken)).length, 6);
   console.log(`MCP read and discovery passed in ${Math.round(performance.now() - wireStarted)} ms. Model: ${config.ollamaModel}`);
   const original = app.store.brief(repair.id);
-  const scenarios = ['Help me understand what is holding up this repair.', 'Prepare a request to the supplier asking for the missing estimate reference.', 'Have you sent that email?', 'Send it now', 'Record: Northbridge Mobility said by phone that the replacement part is delayed.', 'Export my case history'];
+  const scenarios = ['Help me understand what is holding up this repair.', 'Prepare a request to the supplier asking for the missing estimate reference.', 'Have you sent that email?', 'Send it now', 'Record: Northbridge Mobility said by phone that the replacement part is delayed.', 'Remind me tomorrow', 'Export my case history'];
   for (const request of process.argv.includes('--draft-only') ? scenarios.slice(1, 2) : scenarios) {
-    const started = performance.now();
+    const requestedAt = Date.now(); const started = performance.now();
     console.log(`Starting: ${request}`);
     const response: Response = await fetch(`${app.url}/api/agent`, { method: 'POST', headers, body: JSON.stringify({ caseId: repair.id, text: request, allowCloud: false }), signal: AbortSignal.timeout(180000) });
     const result = await response.json() as AgentReply & { error?: string }; assert.equal(response.ok, true, result.error);
     assert.ok(result.reply.trim()); assert.ok(result.traces.every(trace => trace.ok)); assert.ok(!result.traces.some(trace => ['send_approved_request', 'record_repair_event'].includes(trace.tool)));
+    if (request.startsWith('Help me')) {
+      assert.ok(result.reply.startsWith(original.reportedStage)); assert.ok(result.reply.includes(original.nextStep));
+      assert.match(result.reply, /user-maintained record, not an independently verified status/);
+    }
     if (request.startsWith('Prepare')) {
       assert.ok(result.draftId, 'The real model must prepare a persisted draft through MCP.');
       const current = app.store.brief(repair.id); const draft = current.drafts.find(item => item.id === result.draftId); assert.ok(draft); assert.equal(draft.status, 'draft');
@@ -53,6 +57,15 @@ try {
     }
     if (request.startsWith('Have you')) assert.match(result.reply, /awaiting approval/);
     if (request.startsWith('Record:')) assert.equal(result.action, 'record');
+    if (request === 'Remind me tomorrow') {
+      assert.ok(result.traces.some(trace => trace.tool === 'manage_repair_followup' && trace.ok), 'A reminder confirmation needs a successful MCP write.');
+      const added: Brief['followups'] = app.store.brief(repair.id).followups.filter(item => !original.followups.some(previous => previous.id === item.id));
+      assert.equal(added.length, 1); assert.equal(added[0].status, 'scheduled');
+      assert.ok(Date.parse(added[0].dueAt) > requestedAt, 'Tomorrow must not become a past due item.');
+      const day = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' });
+      assert.equal(day.format(new Date(added[0].dueAt)), day.format(new Date(requestedAt + 86400000)), 'The saved date must be tomorrow in the default user timezone.');
+      assert.match(result.reply, /24 hours/); assert.match(result.reply, /no message will be sent automatically/i);
+    }
     if (request.startsWith('Export')) {
       const packet = result.packet; assert.ok(packet?.content);
       assert.ok(result.traces.some(trace => trace.tool === 'export_repair_packet' && trace.ok));
@@ -69,7 +82,7 @@ try {
     console.log(`${request}: ${results.at(-1)!.durationMs} ms; ${result.traces.map(trace => trace.tool).join(', ')}`);
   }
   const final: Brief = app.store.brief(repair.id);
-  assert.equal(final.events.length, original.events.length); assert.equal(final.followups.length, original.followups.length); assert.ok(final.drafts.every(draft => draft.status === 'draft'));
+  assert.equal(final.events.length, original.events.length); assert.equal(final.followups.length, original.followups.length + (process.argv.includes('--draft-only') ? 0 : 1)); assert.ok(final.drafts.every(draft => draft.status === 'draft'));
   await mkdir('.data/verification', { recursive: true });
   const report = `.data/verification/ollama-${process.argv.includes('--draft-only') ? 'draft' : 'live'}.json`;
   await writeFile(report, JSON.stringify({ testedAt: new Date().toISOString(), model: config.ollamaModel, dataset: 'Isolated fictional in-memory fixtures; no email delivery; not user-impact validation', results }, null, 2));

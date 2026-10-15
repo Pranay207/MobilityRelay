@@ -234,14 +234,19 @@ Host/Origin checks and bearer authentication protect `/mcp`.
 
 ### AI Is Bounded; Actions Are Reviewed
 
-- Both AI modes discover the real MCP catalog. Default local commands also call MCP.
+- Model-assisted operations in both AI modes discover the real MCP catalog. Trusted short commands also call MCP without inference.
 - The host injects the active case, restricts requested operations and resolves short case-scoped contact/question references to real IDs.
 - The model cannot record evidence or send messages. Follow-up tools may create only, not edit or cancel existing items.
 - Source-backed draft wording comes from the repair service, not arbitrary model-written subject/body claims.
+- Supported `Remind me tomorrow` / next-day commands use the existing 24-hour rule in every agent mode. They confirm only after a successful MCP write; no model or cloud consent is needed for this local operation.
 - Read context is bounded: six recent messages, up to 12 current sources, 15 open questions, ten contacts, five request statuses and eight follow-ups. Draft selection receives only scoped contacts/questions and omitted counts, not full reports or chat history; the service still uses the actual reports to produce the reviewed message. This is not a complete AI case audit.
 - The loop allows at most five turns/eight attempted tools. Bedrock call/conversation limits are 25/45 seconds; Ollama limits are 90/150 seconds. These are bounds, not speed guarantees.
 - Equivalent writes share an idempotency key within a conversation. Provider failure does not silently switch modes or replay a write; a completed action retains its handle and trace.
-- The first successful requested action immediately returns its trusted host confirmation, without another inference pass or further actions from that model batch. Direct delivery-status answers also use actual recorded state. Free-form read answers can still overclaim; general model accuracy is not established.
+- The first successful requested action immediately returns its trusted host confirmation, without another inference pass or further actions from that model batch. Delivery status and read replies use recorded state: read text is rendered from the latest structured MCP brief, not model outcome predictions. This is a bounded case assistant, not open-ended factual Q&A; general model accuracy is not established.
+
+The UI ignores refresh results/errors superseded by a newer action, selection
+or refresh. This prevents a slow poll from hiding an already-saved reply or
+follow-up; it does not cache or change the underlying case record.
 
 The web host reuses one initialized MCP client and discovered tool catalog for
 its lifetime. Concurrent first reads share negotiation. Only schema metadata is
@@ -293,9 +298,48 @@ not establish the native toolkit's sub-500 ms query target.
 
 ## 4. Testing and Latest Results
 
-**Full QA baseline: October 14, 2026.** These results apply to the tested
-implementation committed as `a6995f4`; this documentation consolidation changes
-no application code. Tests use isolated fictional records, not real health data.
+### Latest Workflow Recheck: October 15
+
+The finished source passes **95 backend tests**, TypeScript and the production
+build, plus **42 desktop/mobile-emulation browser tests in one 6.4-minute run**.
+There were no retries, skipped tests or increased assertion timeouts. The
+rebuilt non-root Docker image also passed authentication, real MCP, unapproved
+send rejection, custom-port health and persistence after restart. A fresh npm
+audit reported zero known vulnerabilities. Tests used fictional records only.
+
+Three problems were reproduced and fixed:
+
+- A delayed poll could hide a newer chat reply or saved follow-up. Four new desktop/mobile regression cases failed before the generation guard and passed afterward. The old response affected display state, not persisted records.
+- The real small model replied to `Remind me tomorrow` without creating a due item. The supported command now calls real MCP with the trusted 24-hour rule in every mode. Tests cover all three modes and a rejected write without a saved confirmation.
+- A real read reply incorrectly predicted insurer authorization. Read responses now render the latest structured MCP stage/next question or follow-up list. Adversarial tests in both model modes reject generated outcome wording and verify that a later MCP brief supersedes the initial snapshot.
+
+The expanded **seven-scenario Ollama-mode API run passed**, including grounded
+status, draft preparation, delivery-status read, blocked voice send, reviewed
+update proposal, correctly dated tomorrow reminder, and redacted export.
+Simple safety/short-command paths are deterministic, not seven model calls.
+Actual-model desktop draft review and mobile persisted conversation also passed;
+the draft stayed unapproved and no email was delivered. English `en-IN` input
+and output settings are checked in controlled browser speech tests.
+
+One local run measured approximately 27.4 seconds for an AI read, 4.4 seconds
+for draft selection, 325 ms for the trusted reminder and 36.7 seconds for an
+AI export; separate actual-browser draft review took 7.0 seconds. These are
+spot checks, not latency guarantees. Manual export/local mode remain available.
+Physical microphone/speakers, independent user benefit, live SMTP/Bedrock,
+complete Compose inference and public HTTPS are still unverified.
+
+Ignored evidence includes `.data/verification/workflow-audit-final-check.log`,
+`workflow-audit-release-browser.log`, `workflow-audit-live-final.log`,
+`workflow-audit-live-ui.log`, `workflow-audit-docker-build.log` and
+`workflow-audit-dependencies.log`. Earlier failing probes remain separate in
+`workflow-audit-refresh-before.log` and `workflow-audit-live-model.log`.
+Do not publish raw machine logs or trust bundles.
+
+### October 14 Baseline
+
+These earlier results apply to implementation `a6995f4`. That documentation
+consolidation changed no application code. They are historical results, not
+the latest workflow gate above.
 
 ```sh
 npm run check
@@ -311,7 +355,7 @@ npm run test:ollama:ui
 npx tsx scripts/verify-http-framing.ts
 ```
 
-| Check | Latest result | Important limit |
+| Check | October 14 result | Important limit |
 | --- | --- | --- |
 | Backend, TypeScript and production build | 84 tests passed; typecheck/build passed | Does not validate external services. |
 | Browser workflows | All 34 desktop/mobile-emulation tests passed in one full run, 3.6 minutes, no retries | Edge on this Windows host, not physical mobile devices. |
@@ -459,7 +503,7 @@ The timer is excluded from repeated live announcements.
 | Full browser regression | **38/38 passed in 3.4 minutes**, desktop and mobile emulation, no retries or increased assertion timeouts. Includes new next-step/source/readability and delayed-response timer checks. |
 | Layout/accessibility | Long-field checks at 320, 390, 768, 1440 and 1920 px passed. Automated accessibility scans detected no violations in the tested states. Desktop/mobile screenshots were visually inspected; this is not physical-device or full accessibility certification. |
 | Actual local-AI UI | Installed `qwen2.5:1.5b` prepared a source-backed draft through real MCP and opened disabled-until-approved review in **14,447 ms**. Mobile persisted conversation and no uncaught page errors also passed. In-memory fictional data, no approval/delivery; one local observation, not a latency guarantee. |
-| Clean installation | A working-tree source snapshot with no dependencies/build output used a fresh npm cache and `NODE_USE_SYSTEM_CA=1`. `npm ci` installed 265 packages with zero reported vulnerabilities; `npm run check` built the app and passed all **89** backend tests. This is the current uncommitted source on this Windows host, not a fresh GitHub checkout or another OS. Generated snapshot removed after checking; logs retained locally. |
+| Clean installation | A working-tree source snapshot with no dependencies/build output used a fresh npm cache and `NODE_USE_SYSTEM_CA=1`. `npm ci` installed 265 packages with zero reported vulnerabilities; `npm run check` built that source and passed all **89** backend tests. This was an earlier source snapshot on this Windows host, not a fresh GitHub checkout of the latest fixes or another OS. Generated snapshot removed after checking; logs retained locally. |
 | Build/test order | `npm run check` now builds before the HTTP tests that need production assets, so it does not depend on an old `dist` directory. |
 | Docker image | Final image built with the optional build-only CA secret. The isolated verifier passed non-root execution, a nondefault-port health check, protected APIs, real HTTP MCP, unapproved-send rejection, private-file exclusions, and case/event/draft persistence after restart. No network access or mail delivery was enabled. |
 | Compose | `docker compose config --quiet` passed with placeholder settings. Full model download/inference inside Compose and reverse-proxy HTTPS remain **untested**. |
@@ -618,6 +662,7 @@ positives, friction and whether we would use the tool again.
 | Oct 13: Ollama/qwen2.5:1.5b | Full-record prompts timed out/returned empty drafts; some choices/status narration were wrong. Not a proven Ollama bug. | Bounded summaries, scoped references/topics and trusted confirmations. Suggest constrained small-model tool examples and diagnostics. CPU latency remains slow. | `scripts/verify-ollama.ts`, `scripts/verify-ollama-ui.ts`; fictional checks. |
 | Oct 14: Vite middleware | Our configuration served a fictional private-file canary anonymously. | Deny private paths, disable public directory, separate cache. Suggest a full-stack private-storage example. | `tests/security.test.ts`; [Vite docs](https://vite.dev/config/server-options#server-fs-deny). |
 | Oct 14: MCP/Express HTTP framing | Raw TCP saw chunked headers without matching chunks despite local content-length metadata; normalization cause unknown. POST-only fix missed error paths. | Uniform `on-headers` hook and native chunks. Suggest success/error framing tests and no write retries. | `scripts/verify-http-framing.ts`, `tests/http.test.ts`; status paths 200/202/405/401/403/400. |
+| Oct 15: Ollama/qwen2.5:1.5b | A live run missed the reminder write and generated an unsupported authorization prediction. These are model/application integration observations, not a proven Ollama-runtime defect. | Trusted short-command routing and structured case-read rendering; suggest small-model examples that test actual writes and unsupported factual claims, not just HTTP success. | `tests/agent.test.ts`, `scripts/verify-ollama.ts`; seven-scenario rerun passed with fictional data. |
 | Pending: Bedrock | No real account/model-enabled run observed. | Record access, tool use, latency/cost only after a controlled live test. No live AWS qualification claimed. | Optional `server/agent.ts` adapter, not live evidence. |
 | Pending: SMTP provider | No real provider delivery test observed. | Keep capture labels; record TLS setup, acceptance/error and receipt separately after testing. | No provider feedback claimed yet. |
 

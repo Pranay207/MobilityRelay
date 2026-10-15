@@ -79,6 +79,36 @@ test('source-backed voice proposals preserve wording and require a form, not a w
   } finally { s.store.close(); }
 });
 
+for (const mode of ['local', 'bedrock', 'ollama'] as const) test(`${mode} schedules an explicit tomorrow reminder through MCP without model date guesses`, async () => {
+  const s = setup();
+  try {
+    const before = Date.now();
+    const reply = await respond({ caseId: s.c.id, text: 'Relay, please remind me tomorrow.', allowCloud: false }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', {
+      catalog: async () => { throw new Error('A recognized tomorrow command does not need model discovery.'); },
+      converse: async () => { throw new Error('A recognized tomorrow command does not need inference.'); },
+    });
+    const after = Date.now(); const saved = s.store.brief(s.c.id).followups;
+    assert.equal(saved.length, 1); assert.equal(saved[0].status, 'scheduled'); assert.equal(saved[0].timezone, 'Asia/Kolkata');
+    assert.ok(Date.parse(saved[0].dueAt) >= before + 86400000); assert.ok(Date.parse(saved[0].dueAt) <= after + 86400000);
+    assert.equal(saved[0].questionId, s.store.brief(s.c.id).questions[0].id);
+    assert.deepEqual(reply.traces.map(trace => trace.tool), ['get_repair_brief', 'manage_repair_followup']);
+    assert.ok(reply.traces.every(trace => trace.ok)); assert.match(reply.reply, /24 hours/);
+    assert.equal(s.store.brief(s.c.id).drafts.length, 0); assert.equal(s.store.brief(s.c.id).events.length, 1);
+  } finally { s.store.close(); }
+});
+
+test('a rejected tomorrow reminder write cannot produce a saved confirmation', async () => {
+  const s = setup();
+  const failedCall: ToolCaller = async (name, args, traces) => {
+    if (name === 'manage_repair_followup') throw new AppError('Fictional reminder write rejected.');
+    return s.call(name, args, traces);
+  };
+  try {
+    await assert.rejects(respond({ caseId: s.c.id, text: 'Remind me tomorrow', allowCloud: false }, { ...config, agentMode: 'ollama' }, failedCall, 'http://unused.test/mcp'), /Fictional reminder write rejected/);
+    assert.equal(s.store.brief(s.c.id).followups.length, 0);
+  } finally { s.store.close(); }
+});
+
 test('ambiguous or negated reports do not acquire confident stage or source hints', () => {
   const s = setup();
   try {
@@ -146,7 +176,7 @@ test('a model batch cannot create repeated reminders after its first successful 
         { toolUse: { toolUseId: 'first', name: 'manage_repair_followup', input: { title: 'Ask for an ETA', dueAt, action: 'create', timezone: 'Asia/Kolkata' } } },
         { toolUse: { toolUseId: 'second', name: 'manage_repair_followup', input: { action: 'create', timezone: 'Asia/Kolkata', dueAt, title: 'Ask for an ETA' } } },
       ]);
-    }, true, 'Remind me tomorrow');
+    }, true, 'Remind me to ask for a parts ETA tomorrow');
     assert.equal(s.store.list<Followup>('followup', s.c.id).length, 1); assert.equal(turn, 1);
   } finally { s.store.close(); }
 });
@@ -201,6 +231,24 @@ test('an empty model reply is a recoverable failure, not a blank success', async
   const s = setup();
   try { await assert.rejects(s.cloud(async () => output([])), (error: unknown) => error instanceof AppError && error.status === 502); }
   finally { s.store.close(); }
+});
+
+for (const mode of ['bedrock', 'ollama'] as const) test(`${mode} renders read replies from the latest MCP brief, not model outcome predictions`, async () => {
+  const s = setup(); let turns = 0;
+  try {
+    const result = await respond({ caseId: s.c.id, text: 'Help me understand what is holding up this repair.', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async () => {
+      if (++turns === 1) {
+        s.store.recordEvent({ caseId: s.c.id, requestId: randomUUID(), party: 'insurer', source: 'Fictional insurer update', channel: 'Email', occurredAt: new Date().toISOString(), text: 'The insurer reports that coverage was refused.', stage: 'coverage_refused', reference: '', supersedesId: null });
+        return output([{ toolUse: { toolUseId: 'latest', name: 'get_repair_brief', input: {} } }]);
+      }
+      return output([{ text: 'UNSUPPORTED_OUTCOME: Once the receipt is received, the insurer will approve the repair.' }]);
+    } });
+    const latest = s.store.brief(s.c.id);
+    assert.equal(turns, 2); assert.ok(result.reply.startsWith(latest.reportedStage)); assert.ok(result.reply.includes(latest.nextStep));
+    assert.match(result.reply, /user-maintained record/); assert.doesNotMatch(result.reply, /UNSUPPORTED_OUTCOME|will approve|Once the receipt/);
+    assert.deepEqual(result.traces.map(trace => trace.tool), ['get_repair_brief', 'get_repair_brief']);
+    assert.equal(latest.drafts.length, 0); assert.equal(latest.followups.length, 0);
+  } finally { s.store.close(); }
 });
 
 for (const mode of ['bedrock', 'ollama'] as const) {
@@ -275,7 +323,7 @@ for (const mode of ['bedrock', 'ollama'] as const) {
   test(`${mode} reminder requests cannot cancel or alter existing follow-ups`, async () => {
     const s = setup(); let turn = 0;
     try {
-      await respond({ caseId: s.c.id, text: 'Remind me tomorrow', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
+      await respond({ caseId: s.c.id, text: 'Remind me to ask for a parts ETA tomorrow', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
         if (++turn === 1) return output([{ toolUse: { toolUseId: 'cancel', name: 'manage_repair_followup', input: { action: 'cancel', followupId: randomUUID() } } }]);
         assert.match(JSON.stringify(request.messages?.at(-1)), /trusted user control/); return output([{ text: 'No follow-up was changed.' }]);
       } });
