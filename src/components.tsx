@@ -34,6 +34,14 @@ interface Recognition { lang: string; continuous: boolean; interimResults: boole
 type VoiceWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
 const cancelSpeech = () => { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); };
 export const agentLabel = (settings: Settings | null) => settings?.agentMode === 'bedrock' ? 'Amazon Bedrock' : settings?.agentMode === 'ollama' ? `Ollama / ${settings.model || 'local model'}` : 'Local command simulator';
+function WaitingStatus() {
+  const started = useRef(performance.now()); const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setSeconds(Math.floor((performance.now() - started.current) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return <div className="working" role="status"><LoaderCircle className="spin" size={18} /><div><span>Waiting for a response</span><time role="timer" aria-label="Request elapsed time" aria-live="off">{seconds}s elapsed</time></div></div>;
+}
 export function Assistant({ messages, busy, suspended = false, settings, onSend, onError }: { messages: ChatMessage[]; busy: boolean; suspended?: boolean; settings: Settings | null; onSend: (text: string, cloud: boolean) => Promise<void>; onError: (text: string) => void }) {
   const [text, setText] = useState(''); const [listening, setListening] = useState(false); const [sound, setSound] = useState(false); const [cloud, setCloud] = useState(false);
   const recognition = useRef<Recognition | null>(null); const end = useRef<HTMLDivElement>(null); const lastSpoken = useRef(messages.at(-1)?.id ?? '');
@@ -77,7 +85,7 @@ export function Assistant({ messages, busy, suspended = false, settings, onSend,
     <div className="conversation" role="log" aria-label="Repair conversation" aria-live="polite">
       {!messages.length && <div className="assistant-empty"><AudioLines size={28} /><h3>Your repair, one next step.</h3><p>Case record connected</p></div>}
       {messages.map(message => <div key={message.id} className={`message message-${message.role}`}><span className="message-author">{message.role === 'assistant' ? 'Relay' : 'You'}</span><p>{message.text}</p>{message.traces.length > 0 && <details className="tool-trace"><summary><Terminal size={12} /> {message.traces.length} MCP {message.traces.length === 1 ? 'call' : 'calls'}</summary>{message.traces.map((t, i) => <div key={i}><span>{t.tool}</span><span>{t.ok ? `${t.durationMs} ms` : 'Failed'}</span></div>)}</details>}</div>)}
-      {busy && <div className="working" role="status"><LoaderCircle className="spin" size={16} /> Working on your case...</div>}<div ref={end} />
+      {busy && <WaitingStatus />}<div ref={end} />
     </div>
     <div className="assistant-commands"><button disabled={busy} onClick={() => void submit('What is the next step?')}><FileText size={14} /> Case brief</button><button disabled={busy} onClick={() => void submit('Remind me tomorrow')}><Clock size={14} /> Tomorrow</button><button disabled={busy} onClick={() => void submit('Export my case history')}><Download size={14} /> Case packet</button></div>
     {settings?.agentMode === 'bedrock' && <label className="checkline cloud-consent"><input type="checkbox" checked={cloud} onChange={e => setCloud(e.target.checked)} /> Share this case text with Amazon Bedrock</label>}

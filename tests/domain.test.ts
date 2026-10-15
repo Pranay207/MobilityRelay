@@ -45,7 +45,7 @@ test('corrections preserve originals and cannot cross case boundaries', () => {
   assert.throws(() => s.store.get('event', e.id, other.id), /not found/);
   assert.throws(() => s.event('other', 'Second correction', { supersedesId: e.id }), /already been corrected/); s.store.close();
 });
-test('preparing a request never delivers it', () => { const s = setup(); s.event('parts_delayed'); const d = s.draft(); assert.equal(d.status, 'draft'); assert.equal(s.deliveries(), 0); assert.match(d.body, /source /); s.store.close(); });
+test('preparing a request never delivers it and keeps readable source references', () => { const s = setup(); s.event('parts_delayed'); const d = s.draft(); assert.equal(d.status, 'draft'); assert.equal(s.deliveries(), 0); assert.match(d.body, /\[source 1\]/); assert.ok(d.sourceIds.length); assert.ok(d.sourceIds.every(id => !d.body.includes(id))); s.store.close(); });
 
 test('corrected sources replace current question citations without erasing history', () => {
   const s = setup(); const old = s.event('parts_delayed', 'Old unconfirmed date');

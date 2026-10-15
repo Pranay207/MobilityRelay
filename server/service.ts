@@ -24,9 +24,10 @@ export class RepairService {
     return this.store.idempotent('draft', input.caseId, input.requestId, input, () => {
       const sourceIds = [...new Set(questions.flatMap(q => q.sourceIds))];
       const sources = sourceIds.map(id => this.store.get<RepairEvent>('event', id, input.caseId));
+      const sourceNumbers = new Map(this.store.list<RepairEvent>('event', input.caseId).map((event, index) => [event.id, index + 1]));
       const subject = input.subject ?? `Repair ${c.reference || c.title}: clarification requested`;
       if (/[\r\n]/.test(subject)) throw new AppError('The subject must be a single line.');
-      const body = input.body ?? `Hello ${contact.name},\n\nI am following up on ${c.equipment}, reference ${c.reference || 'not provided'}.\n\nMy record contains these reported updates:\n${sources.map(e => `- ${e.occurredAt.slice(0, 10)} | ${e.source}: "${e.text}" [source ${e.id}]`).join('\n')}\n\nPlease clarify:\n${questions.map((q, i) => `${i + 1}. ${q.title} ${q.explanation}`).join('\n')}\n\nPlease include a named contact and the date of the next update. These are attributed reports; I am seeking clarification, not assigning fault.\n\nThank you,\n${c.person}`;
+      const body = input.body ?? `Hello ${contact.name},\n\nI am following up on ${c.equipment}, reference ${c.reference || 'not provided'}.\n\nMy record contains these reported updates:\n${sources.map(e => `- ${e.occurredAt.slice(0, 10)} | ${e.source}: "${e.text}" [source ${sourceNumbers.get(e.id)}]`).join('\n')}\n\nPlease clarify:\n${questions.map((q, i) => `${i + 1}. ${q.title} ${q.explanation}`).join('\n')}\n\nPlease include a named contact and the date of the next update. These are attributed reports; I am seeking clarification, not assigning fault.\n\nThank you,\n${c.person}`;
       const value: Draft = { id: randomUUID(), caseId: c.id, caseVersion: c.version, recipientId: contact.id, recipient: contact.email, subject, body, sourceIds, questionIds: questions.map(q => q.id), hash: hash(JSON.stringify({ recipient: contact.email, subject, body, sourceIds, version: c.version })), status: 'draft', createdAt: now(), deliveryId: null };
       this.store.put('draft', value); return value;
     });

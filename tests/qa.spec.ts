@@ -4,6 +4,48 @@ import { mkdir, writeFile } from 'node:fs/promises';
 
 const viewTab = (page: Page, name: string) => page.getByRole('tab', { name: name === 'Requests' ? /^Requests(?: \d+)?$/ : name, exact: true });
 
+test('next step appears once with readable controls and linked source details', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Was the paperwork received?', exact: true })).toHaveCount(1);
+  const next = page.locator('.question-item.next-step');
+  await expect(next.getByRole('button', { name: 'Prepare a request', exact: true })).toBeVisible();
+  await expect(next.locator('p').first()).toHaveCSS('font-size', '16px');
+  const target = await next.getByRole('button', { name: 'Record answer', exact: true }).boundingBox();
+  expect(target!.height).toBeGreaterThanOrEqual(44);
+  const source = next.locator('.source-links button').first();
+  const label = (await source.innerText()).trim();
+  await source.click();
+  const evidence = page.locator('.evidence.highlighted');
+  await expect(evidence.locator('.evidence-meta strong')).toHaveText(label);
+  await expect(evidence.locator('.source-id').first()).not.toBeVisible();
+  await evidence.getByText('Record details', { exact: true }).click();
+  await expect(evidence.locator('.source-id').first()).toContainText('Record ID:');
+  await expect(evidence.locator('.source-id').first()).toBeVisible();
+});
+
+test('waiting state reports elapsed time without inventing action progress', async ({ page }, info) => {
+  await page.clock.install();
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  let started!: () => void; const waiting = new Promise<void>(resolve => { started = resolve; });
+  await page.route('**/api/agent', async route => { started(); await gate; await route.continue(); }, { times: 1 });
+  try {
+    await page.getByLabel('Message to Relay').fill('What is the next step?');
+    await page.getByRole('button', { name: 'Send message', exact: true }).click(); await waiting;
+    await expect(page.getByText('Waiting for a response', { exact: true })).toBeVisible();
+    const timer = page.getByRole('timer', { name: 'Request elapsed time' });
+    await expect(timer).toHaveAttribute('aria-live', 'off');
+    await page.clock.fastForward(5000);
+    expect(parseInt((await timer.innerText()), 10)).toBeGreaterThanOrEqual(5);
+    await expect(page.getByRole('dialog', { name: 'Review request' })).not.toBeVisible();
+    release(); await expect(page.getByRole('button', { name: 'Case brief', exact: true })).toBeEnabled();
+    await expect(timer).toHaveCount(0);
+    await expect(page.getByRole('log')).toContainText('This is a user-maintained record');
+  } finally { release(); }
+});
+
 test('read-only assistant replies update conversation without a redundant case reload', async ({ page }, info) => {
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
   if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();

@@ -107,10 +107,12 @@ Latest completed local QA: **October 15, 2026**.
 | Check | Result |
 | --- | --- |
 | Backend tests | 89 passed |
-| Desktop/mobile-emulation browser tests | 34 passed in one full run |
+| Desktop/mobile-emulation browser tests | 38 passed in one full run |
 | TypeScript and production build | Passed |
 | Automated accessibility | 21 scans; no detected violations in the tested views |
 | Actual local AI + MCP | Six-scenario API workflow and desktop/mobile UI check passed |
+| Production Docker image | Built; isolated authentication, MCP, approval rejection and restart persistence checks passed |
+| Clean source installation | Fresh npm cache, production build and all 89 backend tests passed on this Windows host |
 | Dependency audit | Zero known vulnerabilities at the time of testing |
 
 ```sh
@@ -122,6 +124,8 @@ Browser tests require installed Microsoft Edge. Results use isolated fictional
 records; automated speech checks are simulated. They do not establish full
 accessibility conformance, general model accuracy or real-world benefit.
 See [QA evidence and limits](docs/project-guide.md#4-testing-and-latest-results).
+The complete Docker Compose/Ollama stack and public HTTPS deployment are not
+verified; see [Docker setup](docs/project-guide.md#docker-and-local-ai).
 
 The October 15 performance fix removes repeated MCP negotiation and redundant
 AI completion calls. In the measured workload, median case reads fell from

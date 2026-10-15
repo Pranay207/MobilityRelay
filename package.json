@@ -16,7 +16,8 @@
     "test:browser": "playwright test",
     "test:ollama": "tsx scripts/verify-ollama.ts",
     "test:ollama:ui": "tsx scripts/verify-ollama-ui.ts",
-    "check": "npm run typecheck && npm test && npm run build"
+    "test:container": "tsx scripts/verify-container.ts",
+    "check": "npm run build && npm test"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.922.0",

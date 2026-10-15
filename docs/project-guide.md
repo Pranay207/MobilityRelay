@@ -127,11 +127,66 @@ Use fictional data. Production/public binding requires an `APP_PASSWORD` of at
 least 16 characters, a separate `MCP_TOKEN` of at least 32 characters and an HTTPS
 `PUBLIC_ORIGIN`. Terminate TLS at a reverse proxy. The Dockerfile targets one
 instance with a persistent `/data` volume; an ephemeral serverless filesystem
-does not suit this SQLite deployment as-is. Docker runtime has not been tested.
+does not suit this SQLite deployment as-is. The app image now passes an isolated
+Linux-container smoke test; the complete Ollama Compose stack and public TLS
+still need end-to-end validation.
 
 This is a shared-password workspace, not a tenant-isolated healthcare system.
 Do not host real sensitive records without further security review, encryption,
 access controls and operational policies.
+
+### Docker and Local AI
+
+The app image does not include a model server. `compose.yaml` supplies a pinned
+Ollama service and model-initialization task. The app shares that service's
+network namespace, so `127.0.0.1:11434` reaches Ollama without weakening the
+adapter's loopback-only origin check. Ollama's API is not published. Only the
+app's port is bound to host loopback. See
+[Compose network modes](https://docs.docker.com/compose/how-tos/networking/) and
+[Ollama Docker setup](https://docs.ollama.com/docker).
+
+1. Configure a unique `APP_PASSWORD` (16+ characters), a separate random
+   `MCP_TOKEN` (32+ characters), and your reverse proxy's actual HTTPS
+   `PUBLIC_ORIGIN` in your environment or ignored `.env`.
+2. Build with `docker build -t mobilityrelay:local .`.
+3. Run `docker compose up -d --no-build`. The first run downloads the pinned
+   Ollama image and `qwen2.5:1.5b`; this can require several GB and is not instant.
+4. Connect your existing HTTPS reverse proxy to `127.0.0.1:4317`, then open
+   `PUBLIC_ORIGIN`. Set `RELAY_HOST_PORT` if host port 4317 is occupied.
+5. `docker compose down` stops the stack without deleting its named model/case
+   volumes. Do not add `-v` unless you intend to permanently delete those records.
+
+This is not public hosting or an included TLS proxy. Plain HTTP is not the
+supported production login route: production cookies are Secure. Use fictional
+data only. Capture mode is enforced in Compose. No complete containerized-model
+run or cloud deployment is claimed yet.
+
+For an independently testable app image, run:
+
+```sh
+npm run test:container -- mobilityrelay:local
+```
+
+The verifier uses a fresh named volume, an unprivileged app process, an
+unpublished network-isolated container, fictional records, a nondefault port,
+and capture-only mail. It checks authentication, real MCP, approval, production
+assets, health and persistence, then removes only its own container/volume.
+It does not call a real model or test public TLS.
+
+A container may not trust the same corporate/local inspection certificates as
+its host. Do not disable verification. Export the **already-trusted public CA**
+to a local PEM file and build with:
+
+```sh
+docker build --secret id=npm_ca,src=/path/to/trusted-ca.pem -t mobilityrelay:local .
+```
+
+The optional BuildKit secret is used by `NODE_EXTRA_CA_CERTS` during `npm ci`
+only, not copied into the runtime image. No private key is required. Only use
+a CA your organisation/machine already trusts. On the tested Windows host,
+the normal build reproduced `UNABLE_TO_VERIFY_LEAF_SIGNATURE`; the build-only
+trusted-root bundle succeeded with TLS verification enabled.
+[BuildKit secrets](https://docs.docker.com/build/building/secrets/).
 
 ## 3. Technical Approach
 
@@ -388,6 +443,43 @@ This is a finite stability check, not proof that latency cannot recur.
 Physical voice, external services and long-duration
 reliability remain separate validation work.
 
+### October 15 Usability and Packaging Follow-up
+
+The workspace now presents one leading next-step question instead of repeating
+it in two sections. Reading/form text is 16 px, principal action targets are at
+least 44 px, and mobile actions wrap. Each record has a consistent `Source N`
+label across question links, history and newly prepared default drafts.
+Technical IDs remain available under **Record details**; attribution, immutable
+records and approval protections are unchanged. Waiting replies show real
+elapsed time, not invented progress or claims that an action has completed.
+The timer is excluded from repeated live announcements.
+
+| Check | Completed result and limits |
+| --- | --- |
+| Full browser regression | **38/38 passed in 3.4 minutes**, desktop and mobile emulation, no retries or increased assertion timeouts. Includes new next-step/source/readability and delayed-response timer checks. |
+| Layout/accessibility | Long-field checks at 320, 390, 768, 1440 and 1920 px passed. Automated accessibility scans detected no violations in the tested states. Desktop/mobile screenshots were visually inspected; this is not physical-device or full accessibility certification. |
+| Actual local-AI UI | Installed `qwen2.5:1.5b` prepared a source-backed draft through real MCP and opened disabled-until-approved review in **14,447 ms**. Mobile persisted conversation and no uncaught page errors also passed. In-memory fictional data, no approval/delivery; one local observation, not a latency guarantee. |
+| Clean installation | A working-tree source snapshot with no dependencies/build output used a fresh npm cache and `NODE_USE_SYSTEM_CA=1`. `npm ci` installed 265 packages with zero reported vulnerabilities; `npm run check` built the app and passed all **89** backend tests. This is the current uncommitted source on this Windows host, not a fresh GitHub checkout or another OS. Generated snapshot removed after checking; logs retained locally. |
+| Build/test order | `npm run check` now builds before the HTTP tests that need production assets, so it does not depend on an old `dist` directory. |
+| Docker image | Final image built with the optional build-only CA secret. The isolated verifier passed non-root execution, a nondefault-port health check, protected APIs, real HTTP MCP, unapproved-send rejection, private-file exclusions, and case/event/draft persistence after restart. No network access or mail delivery was enabled. |
+| Compose | `docker compose config --quiet` passed with placeholder settings. Full model download/inference inside Compose and reverse-proxy HTTPS remain **untested**. |
+
+Earlier runs are not hidden: the first browser run passed 36/38 with two exact
+waiting-label lookup failures; separating the visible label from its timer
+fixed the markup, and both focused checks passed. Another run passed 36/38 with
+speech-workflow failures while setup work was running. The desktop trace shows
+a Vite page reload between transcript review and send; the mobile request was
+still waiting at its assertion deadline. Do not infer a common root cause or
+general stability from these observations. After setup finished, the full
+38-test run above passed without changing assertions/timeouts. Avoid concurrent
+source-copy/build work during browser verification.
+
+Ignored `.data/verification/fresh-usability-install.log`,
+`fresh-usability-check.log`, `usability-browser-final.log`, and
+`docker-build-final.log` record this local run. The actual-model UI check is in
+`usability-ollama-ui.log`. Do not publish raw machine logs
+or trusted-root bundles as submission evidence.
+
 ### Manual Voice and User Checks
 
 Use fictional records. Grant microphone permission only if comfortable with the
@@ -429,7 +521,7 @@ Focus on completing evidence and submission, not adding unrelated features.
 - [ ] Publish an English video under three minutes, with fictional data and honest integration labels.
 - [ ] Submit feedback for every relevant product actually used; fill the log below as observations happen.
 - [ ] Verify the latest committed version from a fresh checkout.
-- [ ] Optional: deploy over HTTPS with persistent storage and test auth/TLS/end-to-end behavior. Test Docker if using it.
+- [ ] Optional: deploy over HTTPS with persistent storage and test auth/TLS/end-to-end behavior. The app image smoke test passes; verify the complete Ollama Compose stack if using it.
 - [ ] Optional AWS Builder: actually validate Bedrock and current bonus eligibility before claiming it. Code alone is not live use.
 - [ ] Optional Open Source: keep MIT licensing and check the mini-challenge separately; a license alone may not satisfy additional contribution requirements.
 
@@ -480,6 +572,40 @@ These are recorded observations, not invented vendor feedback. Where the cause
 is uncertain or our own configuration, say so. The bonus is discretionary.
 Add version, reproduction, impact, workaround and a concrete suggestion for
 each submission-relevant product used. Attach sanitized evidence only.
+
+### Product Feedback Answers
+
+These are developer assessments, not independent user testimonials. Unexercised
+service paths are explicitly marked. The table covers purpose, onboarding,
+positives, friction and whether we would use the tool again.
+
+| Product / purpose | Onboarding and what worked | What needs work / limits observed | Would build again? |
+| --- | --- | --- | --- |
+| Alexa+ docs / track integration | Compared resources, quickstart and FAQ; the own-simulator route enabled development without partner access. | Access context is not equally prominent on every setup page. No native SDK/device testing was possible. | Yes for the simulator route; native access is unevaluated. |
+| MCP TypeScript SDK / runtime tools | Registered six Zod-backed tools and initialized/discovered/called them over HTTP. Typed contracts and traces are useful. | Our bridge needed framing tests on this host; vendor cause is unknown. Repeated negotiation was our inefficiency, now fixed. | Yes, with protocol/lifecycle tests. |
+| Ollama / local inference | Downloaded a model, adapted `/api/chat` tool calls and verified real browser draft review without AWS. | CPU latency, truncated reasoning output and small-model choices needed bounded prompts and trusted confirmations. | Yes, with explicit hardware/model limits. |
+| Bedrock Runtime SDK / optional inference | Implemented typed Converse/tool-use input and tested controlled responses. | No live AWS/model access. Service setup, cost, latency and reliability are unverified; no usage bonus claimed. | Yes for the typed adapter; live evaluation is pending. |
+| React / review workspace | Built views, forms, dialogs and conversation state. Components support explicit review. | Async speech/focus lifecycles needed application tests, not a demonstrated React defect. | Yes, with browser regressions. |
+| Vite / assets | Integrated Express middleware and produced the production bundle. | Our initial configuration exposed a fictional canary. Cache isolation and private-file denials were needed. | Yes, with separate private-storage boundaries. |
+| TypeScript and Zod / contracts | Types and schemas validate tools, forms and configuration; malformed inputs have tests. | Types do not verify model claims or authorize writes. No separate product defect reproduced. | Yes for compile/runtime boundaries. |
+| Node.js / SQLite | Node 24 avoids a separate database server. Restart, correction, deletion and interrupted-send behavior pass tests. | SQLite is marked experimental on this host. Plaintext/shared-workspace storage is not clinical-grade isolation. | Yes for a bounded prototype, not a compliance claim. |
+| Express / host | Wired sessions, CSRF, Host/Origin checks, API routes and assets around MCP. | Middleware ordering, parser errors and file boundaries needed explicit application checks. | Yes, with a reviewed middleware stack. |
+| Undici and on-headers / HTTP | Owned dispatchers, cancellation and framing hooks support the tested transport. | Avoid creation-time deadlines and repeated client setup. Header-normalization source remains unknown. | Yes, with wire/reconnect/no-replay tests. |
+| Browser speech / optional voice | Added review, opt-in replies and text fallback; controlled callbacks pass tests. | Hardware/accuracy unverified; browser availability and vendor processing vary. | Yes as progressive enhancement, retaining forms/text. |
+| Playwright and axe / verification | Installed Edge supports desktop/mobile, keyboard, layout and accessibility checks. | Registry resolution needed a pin. Automated scans do not replace real assistive-technology/user tests. | Yes, with coverage limits disclosed. |
+| Docker and Compose / packaging | Built a non-root image; isolated production/MCP/volume checks pass. Shared namespace configuration preserves loopback access. | Container npm lacked host trust roots. A build-only CA secret fixed TLS. Full Ollama/TLS stack is untested. | Yes, with documented trust/network setup. |
+| Nodemailer / optional SMTP | Implemented TLS-required SMTP and distinct capture/provider states around reviewed messages. | No provider configured or live acceptance/receipt demonstrated. Capture is not delivery. | Yes for the adapter; test a controlled inbox first. |
+| Lucide / icons | Used familiar action icons with labels/tooltips. | No product defect reproduced; sizing/tap areas are our responsibility. | Yes for consistent controls. |
+| Git/GitHub / handover | Pushed source, license, assets, tests and one guide; private data is ignored. | Confirm reviewer access if private. Local testing is not fresh-OS validation. | Yes; verify access at submission. |
+
+### Detailed Friction Examples
+
+| Task / reproduction | Expected vs actual | Severity / workaround / suggestion |
+| --- | --- | --- |
+| Determine Alexa+ access: read resources/setup docs, cross-check FAQ. | Expected consistent guidance; FAQ confirms preview tooling is unavailable to entrants. | Important: used our simulator; suggest access banners on quickstarts. |
+| Build image: run `docker build`, observe `npm ci`, retry with already-trusted public roots as a BuildKit secret. | Expected verified registry downloads; initial certificate-chain failure, then success with the mounted CA bundle. | Important, environment-specific: keep TLS enabled; document trusted corporate-root setup instead of disabling SSL. |
+| Historical Vite check: put a fictional canary in private storage, request without API authentication. | Expected denial; initial configuration served it. Current direct/encoded/`@fs` checks deny access. | Critical application bug, fixed: deny private paths and separate storage/cache; suggest a full-stack private-storage example. |
+| Historical MCP check: exercise success/error/notification paths and raw TCP. | Expected valid framing; some responses advertised chunking without matching chunks. | Important, cause unproven: native framing and wire tests; suggest success/error bridge examples. |
 
 | Date/product | Observation | Workaround and suggestion | Evidence |
 | --- | --- | --- | --- |

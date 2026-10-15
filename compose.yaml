@@ -1,0 +1,55 @@
+name: mobilityrelay
+
+services:
+  ollama:
+    image: ollama/ollama:0.40.4
+    environment:
+      OLLAMA_HOST: 127.0.0.1:11434
+    volumes:
+      - models:/root/.ollama
+    ports:
+      - "127.0.0.1:${RELAY_HOST_PORT:-4317}:4317"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  model-init:
+    image: ollama/ollama:0.40.4
+    network_mode: service:ollama
+    environment:
+      OLLAMA_HOST: 127.0.0.1:11434
+    command: ["pull", "qwen2.5:1.5b"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  app:
+    image: mobilityrelay:local
+    build: .
+    # Share loopback with Ollama without allowing arbitrary model-server origins.
+    network_mode: service:ollama
+    init: true
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4317
+      DATA_DIR: /data
+      APP_PASSWORD: ${APP_PASSWORD:?Set APP_PASSWORD to at least 16 characters}
+      MCP_TOKEN: ${MCP_TOKEN:?Set a separate MCP_TOKEN of at least 32 characters}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set the HTTPS origin of your reverse proxy}
+      AGENT_MODE: ollama
+      OLLAMA_BASE_URL: http://127.0.0.1:11434
+      OLLAMA_MODEL: qwen2.5:1.5b
+      MAIL_MODE: capture
+      SEED_EXAMPLES: "true"
+    volumes:
+      - cases:/data
+    depends_on:
+      model-init:
+        condition: service_completed_successfully
+
+volumes:
+  models:
+  cases:
