@@ -1,6 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { X, Mic, MicOff, Send, Volume2, VolumeX, AudioLines, LoaderCircle, Terminal, FileText, Clock, Download } from 'lucide-react';
+import { Accessibility, X, Mic, MicOff, Send, Volume2, VolumeX, AudioLines, LoaderCircle, Terminal, FileText, Clock, Download } from 'lucide-react';
 import type { ChatMessage, Settings, ToolTrace } from '../shared/types';
+
+export function Brand({ children }: { children?: ReactNode }) {
+  return <div className="brand"><span className="brand-mark" aria-hidden="true"><Accessibility size={27} /></span><span className="brand-copy"><span className="brand-name">MobilityRelay</span><span className="brand-description">Wheelchair repair coordination</span></span>{children}</div>;
+}
 
 export function IconButton({ label, children, onClick, disabled = false, className = '' }: { label: string; children: ReactNode; onClick: () => void; disabled?: boolean; className?: string }) {
   return <button type="button" className={`icon-button ${className}`} title={label} aria-label={label} onClick={onClick} disabled={disabled}>{children}</button>;

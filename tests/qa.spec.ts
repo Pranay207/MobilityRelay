@@ -4,6 +4,56 @@ import { mkdir, writeFile } from 'node:fs/promises';
 
 const viewTab = (page: Page, name: string) => page.getByRole('tab', { name: name === 'Requests' ? /^Requests(?: \d+)?$/ : name, exact: true });
 
+async function checkBrand(page: Page) {
+  const brand = page.locator('.brand');
+  await expect(brand.locator('.brand-name')).toHaveText('MobilityRelay');
+  await expect(brand.locator('.brand-description')).toHaveText('Wheelchair repair coordination');
+  await expect(brand.locator('.brand-description')).toBeVisible();
+  await expect(brand.locator('.brand-mark')).toHaveAttribute('aria-hidden', 'true');
+  const layout = await brand.evaluate(element => {
+    const mark = element.querySelector<HTMLElement>('.brand-mark')!;
+    const copy = element.querySelector<HTMLElement>('.brand-copy')!;
+    const name = element.querySelector<HTMLElement>('.brand-name')!;
+    const description = element.querySelector<HTMLElement>('.brand-description')!;
+    const close = element.querySelector<HTMLButtonElement>('button');
+    return {
+      width: mark.getBoundingClientRect().width, height: mark.getBoundingClientRect().height,
+      separated: mark.getBoundingClientRect().right <= copy.getBoundingClientRect().left,
+      textFits: [name, description].every(text => text.scrollWidth <= text.clientWidth),
+      closeFits: !close?.getClientRects().length || copy.getBoundingClientRect().right <= close.getBoundingClientRect().left,
+      withinViewport: element.getBoundingClientRect().right <= window.innerWidth,
+    };
+  });
+  expect(layout).toEqual({ width: 40, height: 40, separated: true, textFits: true, closeFits: true, withinViewport: true });
+}
+
+test('brand names the repair purpose and fits desktop and mobile navigation', async ({ page }, info) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  for (const width of [320, 390, 768, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 }); await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+    if (width <= 760) await page.getByRole('button', { name: 'Open case navigation', exact: true }).click();
+    await checkBrand(page);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: `.data/screenshots/${info.project.name}-brand-navigation-${width}.png`, fullPage: true });
+    if (width <= 760) { await page.getByRole('button', { name: 'Close navigation', exact: true }).click(); await expect(page.locator('.sidebar')).not.toBeVisible(); }
+  }
+  expect(errors).toEqual([]);
+});
+
+test('brand stays consistent on the sign-in screen without overflow or accessibility violations', async ({ page }, info) => {
+  await page.route('**/api/session', route => route.fulfill({ json: { authenticated: false } }));
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 }); await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Sign in to your workspace', exact: true })).toBeVisible();
+    await checkBrand(page);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    if (width === 390 || width === 1440) await page.screenshot({ path: `.data/screenshots/${info.project.name}-brand-sign-in-${width}.png`, fullPage: true });
+  }
+  const access = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+  expect(access.violations).toEqual([]);
+});
+
 test('next step appears once with readable controls and linked source details', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();

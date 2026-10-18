@@ -102,16 +102,17 @@ environment variables, Windows installation guidance and optional integrations.
 
 ## Verification
 
-Latest completed local QA: **October 15, 2026**.
+Latest backend/setup recheck: **October 18, 2026**. Earlier integration checks
+below retain their documented scope in the project guide.
 
 | Check | Result |
 | --- | --- |
-| Backend tests | 95 passed |
-| Desktop/mobile-emulation browser tests | 42 passed in one full run |
+| Backend tests | 105 passed, including ten SMTP setup/verification checks |
+| Desktop/mobile-emulation browser tests | Earlier full run: 42 passed; October 18 targeted workflow checks: 4 passed |
 | TypeScript and production build | Passed |
 | Automated accessibility | 21 scans; no detected violations in the tested views |
 | Actual local AI + MCP | Seven-scenario Ollama-mode API workflow and desktop/mobile UI check passed |
-| Production Docker image | Built; isolated authentication, MCP, approval rejection and restart persistence checks passed |
+| Production Docker image | Earlier image passed isolated checks; the latest SMTP setup has not been container-retested |
 | Clean source installation | Earlier fresh-cache installation passed on this Windows host; dependencies are unchanged. Latest GitHub checkout still needs verification. |
 | Dependency audit | Zero known vulnerabilities at the time of testing |
 
@@ -124,6 +125,7 @@ Browser tests require installed Microsoft Edge. Results use isolated fictional
 records; automated speech checks are simulated. They do not establish full
 accessibility conformance, general model accuracy or real-world benefit.
 See [QA evidence and limits](docs/project-guide.md#4-testing-and-latest-results).
+For Gmail, use the [connection-only check and controlled inbox test](docs/project-guide.md#gmail-connection-and-inbox-test).
 The complete Docker Compose/Ollama stack and public HTTPS deployment are not
 verified; see [Docker setup](docs/project-guide.md#docker-and-local-ai).
 

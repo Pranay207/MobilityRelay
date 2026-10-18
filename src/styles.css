@@ -23,8 +23,11 @@ h1, h2, h3, p { margin-top: 0; }
 .text-button:hover:not(:disabled) { text-decoration: underline; }
 .app-shell { display: grid; grid-template-columns: 246px minmax(0,1fr); min-height: 100vh; }
 .sidebar { background: #f5f7f5; border-right: 1px solid var(--line); padding: 25px 16px 16px; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
-.brand { display: flex; gap: 9px; align-items: center; font-size: 20px; font-weight: 700; white-space: nowrap; }
-.brand-mark { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; color: #fff; background: var(--green); border-radius: 7px; }
+.brand { display: flex; gap: 9px; align-items: center; min-width: 0; }
+.brand-mark { width: 40px; height: 40px; flex: 0 0 40px; display: inline-flex; align-items: center; justify-content: center; color: #fff; background: var(--green); border-radius: 7px; }
+.brand-copy { flex: 1; min-width: 0; }
+.brand-name { display: block; font-size: 20px; font-weight: 700; line-height: 1.25; white-space: nowrap; }
+.brand-description { display: block; margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--muted); }
 .workspace-label { margin: 23px 10px 25px; display: flex; gap: 8px; align-items: center; color: #77847a; font-size: 14px; }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 6px; background: #429675; display: inline-block; }
 .nav-heading { display: flex; align-items: center; justify-content: space-between; margin: 0 8px 6px; font-size: 13px; color: #7d8882; font-weight: 600; }

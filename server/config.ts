@@ -1,9 +1,8 @@
 import 'dotenv/config';
 import { randomBytes } from 'node:crypto';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
-import nodemailer from 'nodemailer';
-import type { MailDelivery } from './service.js';
 import { localModelEndpoint, localModelName } from './ollama.js';
+export { createMail } from './mail.js';
 
 export interface Config { host: string; port: number; dataDir: string; password: string; mcpToken: string; publicOrigin: string; production: boolean; seed: boolean; agentMode: 'local' | 'bedrock' | 'ollama'; modelId: string; region: string; ollamaBaseUrl: string; ollamaModel: string }
 export function readConfig(): Config {
@@ -28,14 +27,4 @@ export function readConfig(): Config {
   if (config.agentMode === 'bedrock' && !config.modelId) throw new Error('Set BEDROCK_MODEL_ID for Bedrock mode.');
   if (config.agentMode === 'ollama') { localModelEndpoint(config.ollamaBaseUrl); localModelName(config.ollamaModel); }
   return config;
-}
-export function createMail(): MailDelivery {
-  if (process.env.MAIL_MODE !== 'smtp') return { mode: 'capture', send: async () => `local-${randomBytes(8).toString('hex')}` };
-  if (!process.env.SMTP_HOST || !process.env.SMTP_FROM) throw new Error('SMTP mode requires SMTP_HOST and SMTP_FROM.');
-  const transport = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: process.env.SMTP_SECURE === 'true', requireTLS: process.env.SMTP_SECURE !== 'true', auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined, connectionTimeout: 15000, socketTimeout: 20000, disableFileAccess: true, disableUrlAccess: true });
-  return { mode: 'smtp', send: async draft => {
-    const result = await transport.sendMail({ from: process.env.SMTP_FROM, to: draft.recipient, subject: draft.subject, text: draft.body, messageId: `<${draft.id}@mobilityrelay.local>` });
-    if (!result.accepted?.length || result.rejected?.length) throw new Error('The SMTP provider did not accept this recipient.');
-    return result.messageId;
-  } };
 }

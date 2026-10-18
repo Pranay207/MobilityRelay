@@ -116,6 +116,44 @@ ignored `.env` or environment variables, never in Git.
 | `MAIL_MODE=smtp` | Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` and credentials. Test an inbox you control. SMTP acceptance is not proof of receipt; live delivery remains unverified. |
 | `MCP_TOKEN` | Independent bearer token for external MCP clients. Sending still needs separate user approval. A private random token is generated for the built-in host when unset. |
 
+### Gmail Connection and Inbox Test
+
+SMTP uses the same validated, TLS-required settings for the app and the
+connection-only checker. No connection check sends a message or proves that a
+particular sender is allowed, a recipient received it, or a repair progressed.
+
+1. In your ignored `.env`, set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`,
+   `SMTP_SECURE=false`, `SMTP_USER` and `SMTP_FROM` to your sender address, and
+   `SMTP_PASSWORD` to a Google App Password. Google requires 2-Step Verification
+   for App Passwords, and some managed/protected accounts cannot use them.
+   Do not use your normal Google password or paste credentials into chat.
+2. Keep `MAIL_MODE=capture`, then run `npm run mail:verify`. This checks the
+   connection, required TLS and configured login without sending. Missing or
+   invalid settings fail before connecting; provider errors are sanitized.
+3. Only after a successful check, set `MAIL_MODE=smtp` and
+   `DATA_DIR=.data/smtp-test` for an isolated fictional inbox test. Restart with
+   `npm run dev` and open the configured port (4317 by default). Both
+   `npm run dev:ollama` and Compose deliberately force capture mode; neither is
+   the SMTP test launcher. For inference, set `AGENT_MODE=ollama` in `.env` and
+   still use the normal `npm run dev` launcher.
+4. In a fictional case, add an inbox you control under Contacts, confirm the
+   actual address with the verification checkbox, and select it for a fresh
+   draft. Seeded `.example` addresses are blocked from external sending.
+   Review the exact recipient/content and use **Approve & send** once.
+5. Check the received message and spam folder manually. Record provider
+   acceptance and observed receipt separately; an `SMTP accepted` status is not
+   proof of receipt. If the app reports an unknown outcome, check the inbox and
+   provider before attempting another message. There is no automatic retry.
+6. Return to `MAIL_MODE=capture` after the test. Never commit `.env`, private
+   logs, raw provider responses or credentials. Revoke an unused App Password.
+
+Port 587 uses required STARTTLS, not plaintext delivery. Port 465 requires
+`SMTP_SECURE=true`; certificate checks stay enabled. A successful connection
+check does not enable sending. Live Gmail acceptance and inbox receipt remain
+unverified until this controlled test actually succeeds.
+[Google App Passwords](https://support.google.com/accounts/answer/185833?hl=en),
+[Nodemailer verification and TLS](https://nodemailer.com/smtp).
+
 ### Hosting
 
 The project's recorded [hackathon FAQ](https://amazonappdev2026.devpost.com/details/faqs)
@@ -297,6 +335,32 @@ not establish the native toolkit's sub-500 ms query target.
 [Alexa+ quickstart](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-quickstart.html).
 
 ## 4. Testing and Latest Results
+
+### SMTP Setup Recheck: October 18
+
+The production build, TypeScript and **105 backend tests passed**, including
+ten new mail-configuration/verification tests. The checker and app share the
+same TLS-required SMTP settings. Tests cover capture defaults, invalid settings,
+Gmail App Password normalization, sanitized errors, transport closure and a real
+local TCP fixture that refuses STARTTLS. That fixture received no authentication
+or mail commands. Successful authentication is simulated in unit tests, not
+established against Gmail.
+
+The first full backend run hit the existing two-second MCP reconnection test's
+deadline. The isolated test and the next complete run passed unchanged; no
+assertion or deadline was relaxed. The cause of the first timeout is unproven.
+
+Four targeted desktop/mobile browser checks also passed, including case views
+and the evidence/draft/approval/capture/follow-up/export/delete workflow. These
+used isolated fictional records and capture mode, not real email delivery.
+
+`npm run mail:verify` was also exercised with the private blank Gmail template.
+It failed safely before connecting, listed the missing sender/login fields and
+sent no email. The local `.env` stays in capture mode and is excluded from Git
+and Docker. Actual Gmail login, sender acceptance and observed inbox receipt
+remain unverified until the user enters credentials locally and approves a
+controlled test. The earlier AI and container results below retain their dates;
+this recheck does not establish native Alexa+, public hosting or real user impact.
 
 ### Latest Workflow Recheck: October 15
 
