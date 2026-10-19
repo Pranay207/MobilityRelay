@@ -109,6 +109,25 @@ test('read-only assistant replies update conversation without a redundant case r
   expect(caseReads).toEqual([]);
 });
 
+test('Bedrock-labelled UI can submit local commands without cloud consent and retains a rejected model request', async ({ page }, info) => {
+  await page.route('**/api/settings', async route => { const response = await route.fetch(); await route.fulfill({ json: { ...await response.json(), agentMode: 'bedrock' } }); });
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+  const consent = page.getByLabel('Share this case text with Amazon Bedrock'); await expect(consent).not.toBeChecked();
+  const response = page.waitForResponse(result => result.url().endsWith('/api/agent') && result.request().method() === 'POST');
+  await page.getByLabel('Message to Relay').fill('What is the next step?'); await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  const result = await response; expect(result.ok()).toBe(true); expect(result.request().postDataJSON().allowCloud).toBe(false);
+  await expect(page.locator('.message-assistant').last()).toContainText('This is a user-maintained record');
+  const packetResponse = page.waitForResponse(result => result.url().endsWith('/api/agent') && result.request().method() === 'POST'); const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Case packet', exact: true }).click();
+  expect((await packetResponse).request().postDataJSON().allowCloud).toBe(false); expect((await download).suggestedFilename()).toBe('repair-history.html');
+  await page.route('**/api/agent', route => route.fulfill({ status: 403, json: { error: 'Consent is required before sharing case text with Amazon Bedrock.' } }), { times: 1 });
+  await page.getByLabel('Message to Relay').fill('Prepare a request to the supplier'); await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(page.getByLabel('Message to Relay')).toHaveValue('Prepare a request to the supplier');
+  const alert = info.project.name === 'mobile' ? page.getByRole('dialog', { name: 'Relay conversation' }).getByRole('alert') : page.getByRole('alert');
+  await expect(alert).toContainText('Consent is required'); await expect(consent).not.toBeChecked();
+});
+
 test('case views and review dialogs pass automated accessibility checks', async ({ page }, info) => {
   test.setTimeout(180000);
   const findings: { state: string; rule: string; targets: unknown[]; details: string[] }[] = [];

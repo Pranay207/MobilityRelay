@@ -4,6 +4,18 @@ export function commandText(input: string) {
   return input.trim().replace(/^(?:alexa|relay)\s*[,.:]?\s+/i, '').replace(/^(?:(?:please|can you|could you|would you)\s+){1,3}/i, '').trim();
 }
 
+export function directCaseCommand(input: string): 'read' | 'export' | null {
+  const text = commandText(input).replace(/[.!?]+$/, '').trim().replace(/\s+/g, ' ');
+  if ([
+    /^(?:(?:show|tell me|what is|what's) (?:my |the |this )?(?:case|repair) (?:status|summary|brief)|(?:case |repair )?(?:status|summary|brief))$/i,
+    /^(?:(?:show|tell me|what is|what's) (?:my |the )?next step|next step)$/i,
+    /^(?:(?:show|list) (?:my |the )?(?:reminders?|follow[- ]?ups?)|(?:what is|what's) (?:my |the )?next follow[- ]?up)$/i,
+    /^(?:help me understand )?(?:what is|what's) holding up (?:this|my) repair$/i,
+  ].some(pattern => pattern.test(text))) return 'read';
+  if (/^(?:(?:export|download) (?:my |the |a )?(?:case |repair )?(?:history|packet)|(?:make|prepare) (?:my |the |a )?case (?:history|packet))(?: as html)?$/i.test(text)) return 'export';
+  return null;
+}
+
 export function localIntent(input: string): 'blocked' | 'read' | 'record' | 'send' | 'export' | 'reminder' | 'draft' | 'unknown' {
   const text = commandText(input);
   if (/^(?:don't|do not|not|no|never|stop|cancel)\b/i.test(text)) return 'blocked';

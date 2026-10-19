@@ -29,6 +29,30 @@ try {
   }
   const sorted = [...reads].sort((a, b) => a - b);
   const report: Record<string, unknown> = { label, reads, firstReadMs: reads[0], medianReadMs: sorted[10], p95ReadMs: sorted[18], mcpRequests: requests.length, methodCounts: Object.fromEntries([...new Set(requests.map(item => item.method))].map(method => [method, requests.filter(item => item.method === method).length])) };
+  if (process.argv.includes('--commands')) {
+    const model = ollamaConverse(config.ollamaBaseUrl, config.ollamaModel);
+    const before = app.store.brief(repair.id);
+    const commands: { text: string; milliseconds: number; modelCalls: number; traces: Awaited<ReturnType<typeof respond>>['traces'] }[] = [];
+    for (let run = 0; run < 2; run++) {
+      for (const text of ['Show my case status', 'What is the next step?', 'Help me understand what is holding up this repair.', 'Export my case history']) {
+        let modelCalls = 0; const started = performance.now();
+        const reply = await respond({ caseId: repair.id, text, allowCloud: false }, { ...config, agentMode: 'ollama' }, app.mcp.call, `${app.url}/mcp`, { catalog: () => app.mcp.catalog(), converse: async (input, signal) => { modelCalls++; return model(input, signal); } });
+        const elapsed = Math.round(performance.now() - started);
+        assert.ok(reply.traces.every(trace => trace.ok));
+        if (!text.startsWith('Export')) { assert.ok(reply.reply.startsWith(before.reportedStage)); assert.deepEqual(reply.traces.map(trace => trace.tool), ['get_repair_brief']); }
+        else {
+          assert.ok(reply.packet); assert.equal(reply.packet.content.includes(before.repairCase.person), false);
+          assert.ok(reply.traces.some(trace => trace.ok && trace.tool === 'export_repair_packet'));
+        }
+        if (process.argv.includes('--expect-direct')) assert.equal(modelCalls, 0, 'Recognized commands must not wait for inference.');
+        commands.push({ text, milliseconds: elapsed, modelCalls, traces: reply.traces });
+        console.log(`${text}: ${elapsed} ms, ${modelCalls} model calls`);
+      }
+    }
+    assert.deepEqual(app.store.brief(repair.id), before, 'Read/export commands must not change the case.');
+    report.commands = commands;
+    report.commandSetup = { model: config.ollamaModel, dataset: 'Fictional in-memory case; warmed MCP connection; two spot checks per command, not a latency guarantee.' };
+  }
   if (process.argv.includes('--ai')) {
     const model = ollamaConverse(config.ollamaBaseUrl, config.ollamaModel);
     const turns: { wallMs: number; inferenceMs?: number; inputTokens?: number; outputTokens?: number }[] = [];

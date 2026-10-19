@@ -6,7 +6,7 @@ import type { ToolCaller } from './mcp.js';
 import { mcpCatalog } from './mcp.js';
 import { AppError } from './store.js';
 import { toolSchemas, type ToolName } from './schemas.js';
-import { commandText, localIntent, proposesTomorrow, proposeUpdate, requestQuestionKinds } from './intents.js';
+import { commandText, directCaseCommand, localIntent, proposesTomorrow, proposeUpdate, requestQuestionKinds } from './intents.js';
 import { ollamaConverse } from './ollama.js';
 
 export type { AgentReply } from '../shared/types.js';
@@ -33,6 +33,13 @@ export async function respond(input: { caseId: string; text: string; allowCloud:
     await call('manage_repair_followup', { caseId: input.caseId, requestId: randomUUID(), action: 'create', title: question ? `Follow up: ${question.title}` : 'Review repair update', questionId: question?.id ?? null, dueAt: due, timezone: 'Asia/Kolkata' }, traces);
     return { reply: 'Follow-up saved for 24 hours from now. It appears in Follow-ups; no message will be sent automatically.', traces };
   }
+  // Exact case commands need current MCP data, not model-generated interpretation.
+  const direct = directCaseCommand(input.text);
+  if (direct === 'read') return { reply: caseReadReply(brief, input.text), traces };
+  if (direct === 'export' || (config.agentMode === 'local' && intent === 'export')) {
+    const packet = await call<AgentReply['packet']>('export_repair_packet', { caseId: input.caseId, format: 'html', redact: true }, traces);
+    return { reply: 'Your redacted case history is ready. Review it for personal information before sharing it with your chosen advocate.', packet, traces };
+  }
   if (config.agentMode !== 'local') {
     if (config.agentMode === 'bedrock' && !input.allowCloud) throw new AppError('Consent is required before sharing case text with Amazon Bedrock.', 403);
     if (intent === 'draft' && (!brief.contacts.length || !brief.questions.some(question => !question.resolved))) return { reply: 'Add an intended contact and an open question before preparing a request. Nothing has been sent.', traces };
@@ -40,10 +47,6 @@ export async function respond(input: { caseId: string; text: string; allowCloud:
   }
   const text = commandText(input.text).toLowerCase();
   const open = brief.questions.filter(q => !q.resolved);
-  if (intent === 'export') {
-    const packet = await call<AgentReply['packet']>('export_repair_packet', { caseId: input.caseId, format: 'html', redact: true }, traces);
-    return { reply: 'Your redacted case history is ready. Review it for personal information before sharing it with your chosen advocate.', packet, traces };
-  }
   if (intent === 'reminder') {
     return { reply: 'I could not safely determine a single follow-up date and task from that wording. No reminder was created.', traces };
   }

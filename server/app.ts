@@ -141,7 +141,6 @@ export async function startServer(config: Config, mail: MailDelivery, options: {
   app.post('/api/agent', async (req, res) => {
     const input = z.object({ caseId: uuid, text: z.string().trim().min(1).max(4000), allowCloud: z.boolean().default(false) }).strict().parse(req.body);
     store.case(input.caseId);
-    if (config.agentMode === 'bedrock' && !input.allowCloud) throw new AppError('Consent is required before sharing case text with Amazon Bedrock.', 403);
     const history = store.list<ChatMessage>('chat', input.caseId).slice(-6);
     store.chat(input.caseId, 'user', input.text);
     const result = await respond({ ...input, history }, config, call, `${localOrigin}/mcp`, { catalog: () => mcp.catalog() });

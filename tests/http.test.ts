@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 import { startServer } from '../server/app.js';
 import type { Config } from '../server/config.js';
-import type { Brief, Draft } from '../shared/types.js';
+import type { AgentReply, Brief, Draft } from '../shared/types.js';
 
 const config: Config = { host: '127.0.0.1', port: 0, dataDir: '.data/test', password: '', mcpToken: 'test-token-'.repeat(8), publicOrigin: '', production: false, seed: true, agentMode: 'local', modelId: '', region: 'us-east-1', ollamaBaseUrl: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b' };
 test('real HTTP MCP and browser-host workflows enforce permissions end to end', async () => {
@@ -49,6 +49,28 @@ test('real HTTP MCP and browser-host workflows enforce permissions end to end', 
     const agent = await request('/api/agent', { method: 'POST', headers: hostHeaders, body: JSON.stringify({ caseId: c.id, text: 'Remind me tomorrow' }) }); assert.equal(agent.status, 200); assert.ok((await agent.json()).traces.some((t: { tool: string }) => t.tool === 'manage_repair_followup'));
     const exportResult = await request('/api/action', { method: 'POST', headers: hostHeaders, body: JSON.stringify({ tool: 'export_repair_packet', args: { caseId: c.id, format: 'json', redact: true } }) }); assert.equal(exportResult.status, 200); assert.ok(!(await exportResult.json()).data.content.includes('Maya'));
     const chat = await (await request(`/api/cases/${c.id}/chat`, { headers: hostHeaders })).json(); assert.equal(chat.length, 2);
+  } finally { await running.close(); }
+});
+
+for (const mode of ['local', 'bedrock', 'ollama'] as const) test(`${mode} HTTP case commands work without inference while cloud requests still require consent`, async () => {
+  const running = await startServer({ ...config, agentMode: mode, ollamaBaseUrl: 'http://127.0.0.1:1' }, { mode: 'capture', send: async () => { throw new Error('Case command checks must not send.'); } }, { frontend: false, database: ':memory:' });
+  try {
+    const session = await fetch(`${running.url}/api/session`); const { csrf } = await session.json();
+    const headers = { 'Content-Type': 'application/json', Cookie: session.headers.get('set-cookie')!.split(';')[0], 'x-relay-csrf': csrf };
+    const repair = running.store.cases().find(item => item.reference === 'DEMO-1042')!; const before = running.store.brief(repair.id);
+    const ask = (text: string) => fetch(`${running.url}/api/agent`, { method: 'POST', headers, body: JSON.stringify({ caseId: repair.id, text, allowCloud: false }), signal: AbortSignal.timeout(15000) });
+    for (const text of ['What is the next step?', 'Help me understand what is holding up this repair.', 'Export my case history']) {
+      const response = await ask(text); assert.equal(response.status, 200);
+      const reply = await response.json() as AgentReply; assert.ok(reply.traces.every(trace => trace.ok));
+      if (text.startsWith('Export')) {
+        assert.ok(reply.packet); assert.equal(reply.packet.mime, 'text/html'); assert.equal(reply.packet.content.includes(repair.person), false);
+        assert.deepEqual(reply.traces.map(trace => trace.tool), ['get_repair_brief', 'export_repair_packet']);
+      } else { assert.ok(reply.reply.startsWith(before.reportedStage)); assert.deepEqual(reply.traces.map(trace => trace.tool), ['get_repair_brief']); }
+    }
+    if (mode === 'bedrock') for (const text of ['Why is that?', 'Show my case status and remind me tomorrow', 'Export my case history as JSON', 'Prepare a request to the supplier']) {
+      const response = await ask(text); assert.equal(response.status, 403); assert.match((await response.json()).error, /Consent/);
+    }
+    assert.deepEqual(running.store.brief(repair.id), before);
   } finally { await running.close(); }
 });
 

@@ -272,7 +272,8 @@ Host/Origin checks and bearer authentication protect `/mcp`.
 
 ### AI Is Bounded; Actions Are Reviewed
 
-- Model-assisted operations in both AI modes discover the real MCP catalog. Trusted short commands also call MCP without inference.
+- Model-assisted operations in both AI modes discover the real MCP catalog. Supported status/next-step/follow-up reads and redacted HTML history exports call real MCP without inference in every mode. Exact whole-request matching keeps compound requests and different formats on their existing bounded path; there is no case-result cache.
+- Bedrock consent is enforced immediately before the model path. Local commands do not share case text or require cloud consent; a genuine model request without consent still receives 403. The composer lets the server decide rather than disabling all typed requests in Bedrock mode.
 - The host injects the active case, restricts requested operations and resolves short case-scoped contact/question references to real IDs.
 - The model cannot record evidence or send messages. Follow-up tools may create only, not edit or cancel existing items.
 - Source-backed draft wording comes from the repair service, not arbitrary model-written subject/body claims.
@@ -335,6 +336,107 @@ not establish the native toolkit's sub-500 ms query target.
 [Alexa+ quickstart](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-quickstart.html).
 
 ## 4. Testing and Latest Results
+
+### Case Command Speed Fix: October 19
+
+The **working-tree fix after `5e744c2`** removes unnecessary model interpretation
+for supported case commands. It does not replace MCP with fixtures: each read
+calls `get_repair_brief`, and history export also calls `export_repair_packet`
+with HTML format and identity redaction enabled. There is no model call, cached
+case result, new evidence, draft or follow-up write on these direct paths. The
+HTTP conversation host still records chat locally as before.
+
+| Same API probe | Before fix | After fix |
+| --- | --- | --- |
+| `Help me understand what is holding up this repair.` | 47,941 ms | **158 ms** |
+| `Export my case history` | 39,878 ms | **224 ms** |
+
+The separate warmed-MCP command benchmark ran each of four supported commands
+twice: status/next-step/holding-up reads took **79-89 ms** and HTML export
+**166-179 ms**, with **zero model calls** and unchanged case data. Actual
+Ollama-mode browser shortcuts took **765 ms** for Case brief and **543 ms** for
+Case packet, also asserting zero model calls. These are sequential local spot
+checks on fictional data, not controlled population statistics, a production
+SLA or native Alexa+ latency certification.
+
+Verification passed the build and **121 backend tests**, **48 desktop/mobile
+browser tests in 8.4 minutes** without retries/skips, all seven Ollama-mode API
+scenarios, and actual-model desktop draft review/mobile conversation. Five of
+six focused pre-fix routing checks failed before the implementation change;
+the completed suite passes without relaxing assertions. Tests cover fresh data,
+no unintended writes, redaction, failure without a ready packet, exact matching
+and the HTTP cloud-consent boundary. Adversarial model tests use non-shortcut
+wording and still assert actual model execution, not a bypassed test.
+
+Draft selection and unrecognised/compound or different-format model requests
+are not made faster by this fix. Actual draft selection took 24.8 seconds in
+the API check and 8.8 seconds in a separate warmed browser check; general model
+latency/accuracy remain unevaluated. No email was delivered and live Bedrock
+was not tested. Keep those boundaries in the demo and submission.
+
+Reproduce the command benchmark with:
+
+```sh
+node --import tsx scripts/verify-performance.ts fast-commands-oct19 --commands --expect-direct --ai
+```
+
+`--expect-direct` requires zero model calls for supported reads/exports;
+`--ai` separately verifies actual local inference for a persisted, unapproved
+draft. It needs the documented local Ollama model. Evidence is in ignored
+`.data/verification/performance-fast-commands-oct19.json`, the newer
+`.data/verification/ollama-live.json`, and actual-model screenshots under
+`.data/screenshots/`. The earlier GitHub-audit artifacts below remain separate.
+These results were collected from the working tree after `5e744c2`. Verify the
+final published revision from a fresh checkout before submission; the earlier
+checkout covered only the pre-fix version.
+
+### One-by-One Recheck: October 19
+
+Tested the pushed GitHub revision **`5e744c2`**, not a copy of the working
+directory: a fresh clone, empty npm cache, no private `.env` and no existing case
+database. Host: Windows x64, Node 24.11.0, installed Edge. This is agent-run
+software verification, not independent user research or proof of repair benefit.
+
+| Check | Observed result |
+| --- | --- |
+| Fresh installation | `npm ci` installed 265 packages. `NODE_USE_SYSTEM_CA=1` used the Windows trust store; TLS verification stayed enabled. |
+| TypeScript/build/backend | `npm run check` passed the production build and all **105 tests**, with no skipped tests or changed assertions. |
+| Desktop/mobile browser workflows | All **46 tests passed in 5.7 minutes**, without retries or skips, on an isolated port and fictional database. |
+| Accessibility/layout | Tested axe scans found no violations; modal keyboard focus, long text and responsive layouts passed. Desktop/mobile screenshots were inspected. This is not full accessibility certification. |
+| Actual MCP | Real HTTP initialization, discovery and calls to the six-tool server passed, including authentication, approval boundaries, framing and persistence tests. |
+| Actual local AI | All seven Ollama-mode API scenarios passed with `qwen2.5:1.5b`; some supported commands are deterministic, not seven model calls. Real-model desktop draft review and mobile persisted conversation also passed, with no approval or delivery. |
+| Response speed | API spot checks: read **47,941 ms**, draft selection **10,778 ms**, export **39,878 ms**, trusted tomorrow reminder **402 ms**. Separate real-browser draft review: **6,823 ms**. Model-assisted reads/exports remain slow; this audit did not fix them. |
+| Dependency audit | Fresh `npm audit` reported **zero known vulnerabilities**. This is not a penetration test or guarantee of security. |
+| Gmail | Connection-only checker stopped before connecting because `SMTP_FROM`, `SMTP_USER` and `SMTP_PASSWORD` are blank. No message sent; real login and inbox receipt remain unverified. |
+| Physical speech | Controlled English browser speech tests passed; real microphone, speakers and assistive-technology behavior remain unverified. |
+| Independent user benefit | Not tested. The agent-run workflow below is not a participant testimonial or a measurement of human effort saved. |
+| Repository access | Authenticated clone succeeded. GitHub's unauthenticated repository API returned 404; public visibility and accepted reviewer invitations could not be verified. |
+| Video/submission | No public video or completed submission link was supplied for checking. The script and feedback exist, but publication, duration and submitted fields remain unverified. |
+| Latest container / optional AWS | Docker engine was unavailable, so the latest image was not rebuilt/retested. Earlier dated container results remain below. Live Bedrock/AWS Builder use is still unverified. |
+
+The initial sandboxed build failed with subprocess `EPERM`; the unchanged
+command passed with the required execution permission. Backend output also
+included Vite dependency-scan warnings while a short-lived security-test server
+was closing. All assertions passed; this was not a warning-free log. No timeout
+or assertion was relaxed to obtain the results above.
+
+**Fictional task outputs confirmed by software tests:**
+
+| Task | Confirmed output |
+| --- | --- |
+| Clarify conflicting paperwork reports | Both dated sources and the receipt question appear, without assigning fault. |
+| Prepare a supplier request | Real model/MCP draft is persisted with source citations and opens for review; nothing is sent. |
+| Review/approve | The full desktop/mobile workflow requires exact-message approval and records local capture, not email delivery; the question stays open. |
+| Follow up | A due item persists after reload; the supported tomorrow command saves one item and promises no automatic message. |
+| Handover/delete | HTML download and case deletion pass in the full workflow; real-model export also verifies known-identity redaction. |
+
+Reproduce with `npm ci`, `npm run check`, `npm run test:browser`,
+`npm run test:ollama` and `npm run test:ollama:ui`. Actual-model checks need a
+running local Ollama server and the documented model. All use fictional data;
+the verification scripts cannot deliver email. Generated reports/screenshots
+are retained locally under ignored `.data/verification/github-audit-2026-10-19/`.
+That checkout covered only `5e744c2`. The later speed fix and benchmark above
+were verified separately in the working tree, not in that checkout.
 
 ### SMTP Setup Recheck: October 18
 
@@ -609,6 +711,11 @@ alternate task order. Never email a real supplier. Record completion, seconds,
 wrong sources/recipients/dates, unsupported claims and assistance. Ask what was
 confusing; keep objections, not just compliments.
 
+Independent user testing is recommended evidence for Design/Potential Impact,
+not a listed submission prerequisite. The agent-run checks above confirm
+software outputs only; do not enter them as an independent participant below.
+[Submission and judging rules](https://amazonappdev2026.devpost.com/rules).
+
 | Anonymous participant/type | Task order/method | Completed | Seconds | Errors/assistance | Feedback |
 | --- | --- | --- | --- | --- | --- |
 | Not tested | - | - | - | - | - |
@@ -622,13 +729,16 @@ percentages, cost savings, medical benefits or shorter repairs.
 Focus on completing evidence and submission, not adding unrelated features.
 
 - [ ] Verify physical microphone, audible replies and keyboard/screen-reader usability.
-- [ ] Review more real local-AI answers for unsupported claims and slow responses.
-- [ ] Complete an unfamiliar person's fictional task; record failures and feedback.
+- [x] Remove model waits for supported case reads and redacted HTML history exports; October 19 working-tree verification is recorded above.
+- [ ] Review broader model behavior and slow complex requests; the spot checks do not establish general accuracy or fast inference.
+- [ ] Recommended, not compulsory: complete an unfamiliar person's fictional task; record failures and feedback.
 - [ ] If claiming delivery, test SMTP to an inbox you control and distinguish acceptance from receipt. Otherwise keep capture labels.
-- [ ] Recheck current rules, reviewer access/invitations and submission fields. One reviewer invitation may not cover all requirements.
+- [x] Recheck current rules and FAQ (October 19): the own-simulator route is accepted and public hosting is optional.
+- [ ] Confirm reviewer access/invitations and submission fields. One reviewer invitation may not cover all requirements. For a private repo, check the current required reviewer list and accepted invitations; otherwise verify public access and detectable licensing.
 - [ ] Publish an English video under three minutes, with fictional data and honest integration labels.
 - [ ] Submit feedback for every relevant product actually used; fill the log below as observations happen.
-- [ ] Verify the latest committed version from a fresh checkout.
+- [x] Verify the pushed version from a fresh checkout (`5e744c2`, October 19); repeat relevant checks after further code changes.
+- [ ] After pushing the speed fix, verify the final GitHub revision for submission. The earlier checkout does not cover uncommitted fixes.
 - [ ] Optional: deploy over HTTPS with persistent storage and test auth/TLS/end-to-end behavior. The app image smoke test passes; verify the complete Ollama Compose stack if using it.
 - [ ] Optional AWS Builder: actually validate Bedrock and current bonus eligibility before claiming it. Code alone is not live use.
 - [ ] Optional Open Source: keep MIT licensing and check the mini-challenge separately; a license alone may not satisfy additional contribution requirements.
@@ -727,6 +837,7 @@ positives, friction and whether we would use the tool again.
 | Oct 14: Vite middleware | Our configuration served a fictional private-file canary anonymously. | Deny private paths, disable public directory, separate cache. Suggest a full-stack private-storage example. | `tests/security.test.ts`; [Vite docs](https://vite.dev/config/server-options#server-fs-deny). |
 | Oct 14: MCP/Express HTTP framing | Raw TCP saw chunked headers without matching chunks despite local content-length metadata; normalization cause unknown. POST-only fix missed error paths. | Uniform `on-headers` hook and native chunks. Suggest success/error framing tests and no write retries. | `scripts/verify-http-framing.ts`, `tests/http.test.ts`; status paths 200/202/405/401/403/400. |
 | Oct 15: Ollama/qwen2.5:1.5b | A live run missed the reminder write and generated an unsupported authorization prediction. These are model/application integration observations, not a proven Ollama-runtime defect. | Trusted short-command routing and structured case-read rendering; suggest small-model examples that test actual writes and unsupported factual claims, not just HTTP success. | `tests/agent.test.ts`, `scripts/verify-ollama.ts`; seven-scenario rerun passed with fictional data. |
+| Oct 19: application command routing | The host waited for model interpretation before returning a structured case brief or standard HTML export: 47.9/39.9 seconds in local API probes. This was application overhead, not a demonstrated MCP/Ollama defect. | Route exact supported commands through real MCP without inference; retain inference for draft selection and ambiguous requests. Suggest documenting separate tool, model and browser timings. | `scripts/verify-performance.ts`, `tests/agent.test.ts`, `tests/http.test.ts`; same API probes now 158/224 ms, with local spot-check limits above. |
 | Pending: Bedrock | No real account/model-enabled run observed. | Record access, tool use, latency/cost only after a controlled live test. No live AWS qualification claimed. | Optional `server/agent.ts` adapter, not live evidence. |
 | Pending: SMTP provider | No real provider delivery test observed. | Keep capture labels; record TLS setup, acceptance/error and receipt separately after testing. | No provider feedback claimed yet. |
 

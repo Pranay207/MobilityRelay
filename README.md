@@ -102,19 +102,20 @@ environment variables, Windows installation guidance and optional integrations.
 
 ## Verification
 
-Latest backend/setup recheck: **October 18, 2026**. Earlier integration checks
-below retain their documented scope in the project guide.
+Latest code recheck: **October 19, 2026**, including the working-tree command
+responsiveness fix. Tests used isolated fictional records on Windows / Node
+24.11.0. The earlier fresh GitHub checkout covered `5e744c2`, before this fix.
 
 | Check | Result |
 | --- | --- |
-| Backend tests | 105 passed, including ten SMTP setup/verification checks |
-| Desktop/mobile-emulation browser tests | Earlier full run: 42 passed; October 18 targeted workflow checks: 4 passed |
+| Backend tests | 121 passed, including fast routing, cloud-consent, approval, redaction and SMTP checks |
+| Desktop/mobile-emulation browser tests | All 48 passed in one 8.4-minute run; no retries or skips |
 | TypeScript and production build | Passed |
-| Automated accessibility | 21 scans; no detected violations in the tested views |
-| Actual local AI + MCP | Seven-scenario Ollama-mode API workflow and desktop/mobile UI check passed |
+| Automated accessibility | No detected violations in tested views, review dialogs and sign-in screens; keyboard-focus checks passed |
+| Actual local AI + MCP | Seven-scenario Ollama-mode API workflow and real-model desktop review/mobile conversation checks passed |
 | Production Docker image | Earlier image passed isolated checks; the latest SMTP setup has not been container-retested |
-| Clean source installation | Earlier fresh-cache installation passed on this Windows host; dependencies are unchanged. Latest GitHub checkout still needs verification. |
-| Dependency audit | Zero known vulnerabilities at the time of testing |
+| Clean source installation | Fresh GitHub clone of `5e744c2` and empty-cache `npm ci` passed without local credentials or case records; repeat final checkout verification after pushing the fix |
+| Dependency audit | Zero known vulnerabilities reported on October 19 |
 
 ```sh
 npm run check
@@ -133,7 +134,14 @@ The workflow recheck fixed stale refreshes hiding new replies/follow-ups,
 made the supported tomorrow reminder deterministic across agent modes, and
 replaced generated case-status claims with structured MCP-backed summaries.
 English recognition/output settings are regression-tested; physical audio is
-still unverified. Some CPU inference requests still take roughly 30 seconds.
+still unverified. Supported case reads and redacted HTML exports now use real
+MCP directly without waiting for inference. The same October 19 API probes
+improved from **47.9 seconds to 158 ms** for the case read and **39.9 seconds to
+224 ms** for export. Actual Ollama-mode browser shortcuts took **765 ms** for
+Case brief and **543 ms** for Case packet, with zero model calls. These are
+local spot checks, not speed guarantees. Draft selection and complex requests
+still use inference and can be slow; the actual-model browser draft-review
+check passed separately in 8.8 seconds.
 
 The October 15 performance fix removes repeated MCP negotiation and redundant
 AI completion calls. In the measured workload, median case reads fell from
