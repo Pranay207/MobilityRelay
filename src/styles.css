@@ -325,3 +325,30 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
   .topbar { padding-left: 12px; padding-right: 12px; }
   .topbar > div { gap: 4px; }
 }
+/* Source review is an unframed comparison, with independent confirmation. */
+.heading-actions { flex-wrap: wrap; }
+.reply-review h3 { margin: 0; font-size: 18px; }
+.reply-review h4 { margin: 0 0 9px; font-size: 14px; }
+.reply-source { color: #52665b; font-size: 13px; overflow-wrap: anywhere; }
+.reply-quote, .reply-answer blockquote { margin: 0; border-left: 3px solid #bccbc4; padding: 10px 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.reply-answers { min-width: 0; border: 0; padding: 16px 0; margin: 0; border-top: 1px solid #dce3df; }
+.reply-answers legend { padding: 0 8px 0 0; font-size: 14px; font-weight: 600; }
+.reply-answer { padding: 8px 0; }
+.reply-answer .checkline { align-items: flex-start; }
+.reply-answer blockquote { margin-left: 30px; font-size: 14px; }
+.reply-comparison { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border-block: 1px solid #dce3df; }
+.reply-comparison > div { min-width: 0; padding: 18px 12px 18px 0; overflow-wrap: anywhere; }
+.reply-comparison > div + div { border-left: 1px solid #dce3df; padding-left: 18px; }
+.reply-comparison strong { font-size: 20px; }
+.reply-comparison p, .reply-remaining { font-size: 14px; }
+.reply-remaining ul { margin: 0; padding-left: 20px; }
+.reply-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+.reply-footer button { white-space: normal; }
+.reply-changes { padding: 22px 0; border-bottom: 1px solid #dce3df; overflow-wrap: anywhere; }
+.reply-changes p { font-size: 14px; line-height: 1.6; }
+.reply-changes .section-title { flex-wrap: wrap; }
+.reply-change-line { display: flex; align-items: center; gap: 12px; font-size: 16px; }
+.reply-changes p > svg { vertical-align: middle; }
+@media (max-width: 760px) {
+  .reply-footer > button { flex: 1 1 150px; }
+}

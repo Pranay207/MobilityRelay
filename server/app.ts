@@ -8,11 +8,12 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { Store, AppError } from './store.js';
 import { RepairService, type MailDelivery } from './service.js';
 import { createMcpServer, createMcpHost } from './mcp.js';
-import { caseSchema, contactSchema, toolSchemas, type ToolName } from './schemas.js';
+import { caseSchema, contactSchema, replyPreviewSchema, toolSchemas, type ToolName } from './schemas.js';
+import { previewReply } from './replies.js';
 import { respond } from './agent.js';
 import { seedExamples } from './fixtures.js';
 import type { Config } from './config.js';
-import type { ChatMessage, Draft, ToolTrace } from '../shared/types.js';
+import type { Brief, ChatMessage, Draft, Question, ToolTrace } from '../shared/types.js';
 
 const equal = (a: string, b: string) => {
   const aa = Buffer.from(a); const bb = Buffer.from(b);
@@ -126,6 +127,11 @@ export async function startServer(config: Config, mail: MailDelivery, options: {
     res.json(store.resolveQuestion(input.caseId, uuid.parse(req.params.id), input.answer));
   });
   app.get('/api/cases/:id/chat', (req, res) => res.json(store.list<ChatMessage>('chat', uuid.parse(req.params.id))));
+  app.post('/api/replies/preview', async (req, res) => {
+    const input = replyPreviewSchema.parse(req.body); const traces: ToolTrace[] = [];
+    const brief = await call<Brief>('get_repair_brief', { caseId: input.caseId }, traces);
+    res.json({ data: previewReply(brief, input, store.list<Question>('question', input.caseId)), traces });
+  });
   app.post('/api/action', async (req, res) => {
     const input = z.object({ tool: z.enum(['record_repair_event', 'get_repair_brief', 'prepare_repair_request', 'manage_repair_followup', 'export_repair_packet']), args: z.record(z.unknown()) }).strict().parse(req.body);
     const traces: ToolTrace[] = []; const data = await call(input.tool, input.args, traces); res.json({ data, traces });

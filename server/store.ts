@@ -10,10 +10,12 @@ export const hash = (value: string) => createHash('sha256').update(value).digest
 export class AppError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }
-export type NewEvent = Omit<RepairEvent, 'id' | 'recordedAt'> & { requestId: string };
+export type NewEvent = Omit<RepairEvent, 'id' | 'recordedAt' | 'review'> & { requestId: string };
 
 export class Store {
   db: DatabaseSync;
+  private transactionDepth = 0;
+  private savepointId = 0;
   constructor(path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
@@ -32,9 +34,12 @@ export class Store {
   }
   close() { this.db.close(); }
   transaction<T>(fn: () => T): T {
-    this.db.exec('BEGIN IMMEDIATE');
-    try { const value = fn(); this.db.exec('COMMIT'); return value; }
-    catch (error) { this.db.exec('ROLLBACK'); throw error; }
+    const savepoint = this.transactionDepth ? `relay_${++this.savepointId}` : null;
+    this.db.exec(savepoint ? `SAVEPOINT ${savepoint}` : 'BEGIN IMMEDIATE');
+    this.transactionDepth++;
+    try { const value = fn(); this.db.exec(savepoint ? `RELEASE ${savepoint}` : 'COMMIT'); return value; }
+    catch (error) { this.db.exec(savepoint ? `ROLLBACK TO ${savepoint}` : 'ROLLBACK'); if (savepoint) this.db.exec(`RELEASE ${savepoint}`); throw error; }
+    finally { this.transactionDepth--; }
   }
   cases(): RepairCase[] { return this.db.prepare('SELECT payload FROM cases').all().map(row => JSON.parse(String(row.payload))).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); }
   case(id: string): RepairCase {
@@ -106,8 +111,8 @@ export class Store {
       const ids = sources.filter(Boolean).map(event => event!.id);
       const existing = this.list<Question>('question', caseId).find(q => q.kind === kind);
       if (existing) {
-        const changed = ids.some(id => !existing.sourceIds.includes(id));
-        this.put('question', { ...existing, sourceIds: ids, active: true, resolved: changed ? false : existing.resolved, answer: changed ? '' : existing.answer });
+        const changed = ids.some(id => !existing.sourceIds.includes(id)) || !!(existing.answerSourceId && !events.some(event => event.id === existing.answerSourceId));
+        this.put('question', { ...existing, title, explanation, sourceIds: !changed && existing.resolved && existing.answerSourceId ? [...new Set([...ids, existing.answerSourceId])] : ids, active: true, resolved: changed ? false : existing.resolved, answer: changed ? '' : existing.answer, answerSourceId: changed ? undefined : existing.answerSourceId });
         return;
       }
       this.put('question', { id: randomUUID(), caseId, kind, title, explanation, sourceIds: ids, resolved: false, answer: '', createdAt: now(), active: true } satisfies Question);
@@ -116,7 +121,7 @@ export class Store {
     if (sent && (requested || pending)) add('receipt', 'Was the paperwork received?', 'Sent and received are different steps. Ask for the submission date, recipient, and receipt reference. These updates do not establish fault.', [sent, requested, pending]);
     else if (requested) add('paperwork', 'Which document is still needed?', 'Ask for the exact document, who must provide it, and where it should be sent.', [requested]);
     const approved = latest('authorization_approved'); const ordered = latest('part_ordered');
-    if (pending && (!approved || events.indexOf(pending) > events.indexOf(approved))) add('approval', 'What is blocking authorization?', 'Ask whether the request is received, complete, or under review. Pending does not identify the responsible party.', [pending]);
+    if (pending && (!approved || events.indexOf(pending) > events.indexOf(approved))) add('approval', 'What is blocking authorization?', 'Ask what remains under review, which information is missing, and when the next update is expected. Pending does not identify the responsible party.', [pending]);
     if (approved && (!ordered || events.indexOf(approved) > events.indexOf(ordered))) add('order', 'Have the parts been ordered?', 'Ask for an order reference and expected arrival date.', [approved]);
     if (latest('coverage_refused')) add('coverage', 'Why was coverage refused?', 'Request the written reason and the available review process. This is a clarification request, not an insurance decision or legal appeal.', [latest('coverage_refused')]);
     if (latest('parts_delayed')) add('parts', 'When will the part be available?', 'Request the part reference, availability, expected arrival, and next update date.', [latest('part_ordered'), latest('parts_delayed')]);
@@ -138,7 +143,7 @@ export class Store {
   resolveQuestion(caseId: string, id: string, answer: string): Question {
     const question = this.get<Question>('question', id, caseId);
     if (question.active === false) throw new AppError('This question no longer applies to the current reports. Refresh the case.', 409);
-    const value = { ...question, resolved: true, answer };
+    const value = { ...question, resolved: true, answer, answerSourceId: undefined };
     this.transaction(() => {
       this.put('question', value);
       this.put('event', { id: randomUUID(), caseId, party: 'user', source: 'User-recorded answer', channel: 'Personal note', occurredAt: now(), recordedAt: now(), text: `${question.title}\n${answer}`, stage: 'other', reference: question.id, supersedesId: null } satisfies RepairEvent);

@@ -2,6 +2,7 @@ import { randomUUID, randomBytes } from 'node:crypto';
 import type { Contact, Draft, Followup, Question, RepairEvent } from '../shared/types.js';
 import { Store, AppError, hash, now } from './store.js';
 import { toolSchemas, type ToolName } from './schemas.js';
+import { previewReply } from './replies.js';
 
 export interface MailDelivery { mode: 'capture' | 'smtp'; send: (draft: Draft) => Promise<string> }
 export class RepairService {
@@ -9,12 +10,40 @@ export class RepairService {
   async run(name: ToolName, args: unknown): Promise<unknown> {
     switch (name) {
       case 'get_repair_brief': return this.store.brief(toolSchemas[name].parse(args).caseId);
-      case 'record_repair_event': return this.store.recordEvent(toolSchemas[name].parse(args));
+      case 'record_repair_event': return this.record(toolSchemas[name].parse(args));
       case 'prepare_repair_request': return this.prepare(toolSchemas[name].parse(args));
       case 'send_approved_request': return this.send(toolSchemas[name].parse(args));
       case 'manage_repair_followup': return this.followup(toolSchemas[name].parse(args));
       case 'export_repair_packet': return this.export(toolSchemas[name].parse(args));
     }
+  }
+  record(input: ReturnType<typeof toolSchemas.record_repair_event.parse>): RepairEvent {
+    const { replyReview: review, ...eventInput } = input;
+    if (!review) return this.store.recordEvent(eventInput);
+    return this.store.idempotent('reply', input.caseId, input.requestId, input, () => {
+      if (this.store.db.prepare('SELECT id FROM requests WHERE id=?').get(`${input.caseId}:event:${input.requestId}`)) throw new AppError('This request ID already belongs to an update. Start a new reply review.', 409);
+      const before = this.store.brief(input.caseId);
+      if (before.repairCase.version !== review.expectedVersion) throw new AppError('The case changed after this preview. Preview the reply again.', 409);
+      const { requestId: _, ...source } = eventInput;
+      const preview = previewReply(before, source, this.store.list<Question>('question', input.caseId));
+      if (preview.previewHash !== review.previewHash) throw new AppError('The reviewed source changed or draft list changed. Preview the reply again.', 409);
+      const selected = new Set(review.answeredQuestionIds);
+      if (selected.size !== review.answeredQuestionIds.length || [...selected].some(id => !preview.answers.some(a => a.questionId === id))) throw new AppError('Only supported answers from this preview can be selected.', 409);
+      const event = this.store.recordEvent(eventInput);
+      for (const answer of preview.answers.filter(a => selected.has(a.questionId))) {
+        const question = this.store.get<Question>('question', answer.questionId, input.caseId);
+        this.store.put('question', { ...question, resolved: true, answerSourceId: event.id, sourceIds: [...new Set([...question.sourceIds, event.id])], answer: `${input.source} | ${input.occurredAt} | ${input.channel}\n"${answer.quote}"\nUser-reviewed reply. Source: ${event.id}. Reported, not independently verified.` });
+      }
+      const after = this.store.brief(input.caseId);
+      const result: RepairEvent = { ...event, review: {
+        beforeStage: before.reportedStage, afterStage: after.reportedStage,
+        beforeOpenCount: preview.before.openCount, afterOpenCount: after.questions.filter(q => !q.resolved).length,
+        answeredQuestionIds: [...selected], answeredTitles: preview.answers.filter(a => selected.has(a.questionId)).map(a => a.title),
+        nextStep: after.nextStep, invalidatedDraftIds: preview.invalidatedDraftIds, caseVersion: after.repairCase.version,
+      } };
+      this.store.put('event', result);
+      return result;
+    });
   }
   prepare(input: ReturnType<typeof toolSchemas.prepare_repair_request.parse>): Draft {
     const c = this.store.case(input.caseId);

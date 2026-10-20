@@ -16,9 +16,10 @@ export function directCaseCommand(input: string): 'read' | 'export' | null {
   return null;
 }
 
-export function localIntent(input: string): 'blocked' | 'read' | 'record' | 'send' | 'export' | 'reminder' | 'draft' | 'unknown' {
+export function localIntent(input: string): 'blocked' | 'read' | 'record' | 'reply' | 'send' | 'export' | 'reminder' | 'draft' | 'unknown' {
   const text = commandText(input);
   if (/^(?:don't|do not|not|no|never|stop|cancel)\b/i.test(text)) return 'blocked';
+  if (/^(?:review (?:a |the |this )?reply|(?:the |my )?(?:insurer|supplier) replied)\b/i.test(text)) return 'reply';
   if (/^(?:what|who|why|when|where|how|is|are|did|does|do|has|have|show|tell me|status|summary|next step)\b/i.test(text)) return 'read';
   if (/^(?:record|log|note that|add (?:an? )?update|(?:the |my )?(?:supplier|insurer) (?:said|says|told me))\b/i.test(text)) return 'record';
   if (/^(?:send|email it|approve)\b/i.test(text)) return 'send';
@@ -26,6 +27,13 @@ export function localIntent(input: string): 'blocked' | 'read' | 'record' | 'sen
   if (/^(?:remind me|schedule (?:a )?follow[- ]?up|set (?:a )?reminder|follow[- ]?up)\b/i.test(text)) return 'reminder';
   if (/^(?:draft|prepare|write|ask (?:the|my)|request clarification)\b/i.test(text)) return 'draft';
   return 'unknown';
+}
+
+export function proposeReply(input: string, brief: Brief): UpdateProposal {
+  const text = commandText(input).replace(/^review (?:a |the |this )?reply\s*[:,.-]?\s*/i, '');
+  const party = /^(?:the |my )?(insurer|supplier) replied\b/i.exec(text)?.[1]?.toLowerCase() as Party | undefined;
+  const contacts = brief.contacts.filter(contact => contact.role === party);
+  return { text: text.replace(/^(?:the |my )?(?:insurer|supplier) replied\s*[:,.-]?\s*/i, ''), party, ...(contacts.length === 1 ? { source: contacts[0].name } : {}) };
 }
 
 export function proposesTomorrow(input: string) {

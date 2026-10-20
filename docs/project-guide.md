@@ -20,7 +20,7 @@ self-hosted MCP server. It is not a native Alexa+ skill or certified integration
 | --- | --- |
 | Who is it for? | Wheelchair users, caregivers and their chosen advocates. |
 | What problem does it address? | Repair updates are scattered across calls, emails and organisations; the user has to remember what was said and chase missing information. |
-| What works now? | Case records, reviewed updates, unanswered questions, source-backed drafts, exact-message approval, local message capture, follow-ups and HTML/JSON export. |
+| What works now? | Case records, source-quoted reply review with before/after changes, unanswered questions, fresh source-backed drafts, exact-message approval, local capture, follow-ups and HTML/JSON export. |
 | Is MCP real? | Yes. The web host initializes, discovers and calls six tools over HTTP using the official MCP SDK. |
 | Is AI real? | Optional local Ollama inference has been tested. Default local mode is a limited command interpreter, not an LLM. |
 | What is not verified? | Native Alexa+, live Bedrock, real SMTP delivery, physical speech hardware, public hosting and independent user benefit. |
@@ -57,6 +57,33 @@ repair tracking is new or that this approach is globally unique.
 4. Prepare a request using those sources; check recipient and wording.
 5. Approve the exact message. Default mode captures it locally, not by email.
 6. Track a follow-up, record a response or correction, and export the case pack.
+
+### Review a Reply: What Changed?
+
+Use **Review reply**, or say/type **"The insurer replied: We received the
+estimate. Reference AB-47. Authorization is still pending."** The conversation
+opens a review form; it does not save evidence or answer a question. Confirm
+the source role/name, channel, report date and reply text. Add AB-47 as the reply
+reference if appropriate; references are not extracted automatically.
+
+Preview shows the original text, exact supporting quotation, before/after stage,
+unanswered questions and drafts that will require fresh review. Answer selections
+start unchecked. Select the receipt answer and confirm the review to save. In
+the example, receipt is answered but authorization remains pending. With no
+answers selected, only the attributed reply is recorded.
+
+The persistent **What changed?** section links to the reply and shows the
+historical review result. **Prepare next request** uses current open questions.
+Old drafts remain in history with stale approval blocked; **Prepare fresh draft**
+opens current question/recipient selection instead of reusing old wording.
+
+Recognition is deliberately narrow: an affirmative insurer sentence such as
+"We received the estimate." can propose a receipt answer; explicit pending
+authorization can suggest that situation. Negated, conditional, conflicting,
+unsupported and ambiguous wording proposes no answer. Other reply kinds can be
+logged without answering anything, or answered with the existing manual review
+form. This is not general email NLP, autonomous inbox ingestion or independently
+verified receipt. Source text is always treated as data, never permission.
 
 Supported situations include missing paperwork, coverage refusals, unavailable
 parts or technicians, assessment requests, appointment delays, ignored requests
@@ -255,7 +282,7 @@ Exact schemas are in `server/schemas.ts`; business rules are in
 
 | Tool | Main inputs | Result and boundary |
 | --- | --- | --- |
-| `record_repair_event` | Case, request ID, party, source, channel, report date, statement, situation, optional correction link | Appends an attributed update. Called only after user review in the simulator. |
+| `record_repair_event` | Case, request ID, party, source, channel, report date, statement, situation, optional correction link or `replyReview` | Appends an attributed update. Reviewed replies can atomically answer selected source-backed questions; explicit confirmation is required. |
 | `get_repair_brief` | Case ID | Reads history, questions, drafts and follow-ups. An unanswered question is not proof of fault. |
 | `prepare_repair_request` | Case, request ID, recipient, question IDs | Persists a source-backed draft; does not send it. |
 | `send_approved_request` | Case, draft ID, approval token | Attempts the exact approved message. No valid approval means no send; capture is not delivery. |
@@ -269,6 +296,27 @@ notification and error responses. Independent wire tests cover this behavior.
 Host/Origin checks and bearer authentication protect `/mcp`.
 [Transport specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports),
 [official SDK](https://github.com/modelcontextprotocol/typescript-sdk/tree/v1.x).
+
+### Reply Review Implementation
+
+`POST /api/replies/preview` requires the authenticated session and CSRF token.
+It reads the case through real MCP `get_repair_brief`; the host also supplies
+retained question history so reactivated questions keep their existing order.
+`server/replies.ts` clones the case into an in-memory Store and applies the
+existing question rules there. Preview does not write case data or send mail.
+
+The save uses the existing MCP `record_repair_event` with optional `replyReview`
+(expected version, source/candidate hash, selected question IDs and explicit
+confirmation). The service recomputes permitted candidates and rejects stale,
+changed, duplicate, unsupported or cross-case selections. Evidence, selected
+answers and a safe review summary commit in one SQLite transaction. Nested
+operations use savepoints; a failure rolls back all changes and retry keys.
+An identical request ID/payload returns the original result, not another event.
+
+The saved question links to the exact source; correcting that source reopens
+the answer. Draft case-version checks invalidate old approvals. The assistant
+cannot call the evidence tool, so voice can open review but cannot commit it.
+No new cloud/model call, library, seventh MCP tool or automatic message is added.
 
 ### AI Is Bounded; Actions Are Reviewed
 
@@ -336,6 +384,35 @@ not establish the native toolkit's sub-500 ms query target.
 [Alexa+ quickstart](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-quickstart.html).
 
 ## 4. Testing and Latest Results
+
+### Reviewed Reply Workflow: October 20
+
+Final working-tree verification passed the production build, **146 backend
+tests** and all **60 desktop/mobile-emulation browser tests in one 5.3-minute
+run**, without retries or skips. This adds 25 backend and 12 browser checks.
+Tests used isolated fictional data on Windows / Node 24.11.0 / installed Edge.
+
+- Preview leaves case records, approvals and request keys unchanged; supporting quotes are exact source substrings.
+- Negated, conditional, conflicting, wrong-party and unsupported wording cannot propose an answer. Empty selection records evidence only.
+- Stale versions, edited source/hash, unsupported or duplicate IDs, false confirmation and changed draft lists are rejected without writes.
+- Injected save failure rolls back evidence, answers, version and retry keys. Identical retries do not create another event.
+- Receipt can be answered while authorization remains open. Correcting the answer source reopens receipt; ordinary notes preserve its source link.
+- Old message approval is blocked. Fresh-request selection excludes answered receipt and replaces old wording with current source-backed content.
+- Desktop/mobile tests cover reload persistence, confirmation resets, cancelled-preview case isolation, controlled English speech, keyboard focus and axe scans.
+- Screenshots at 320, 390, 768 and 1440px confirmed wrapping and no horizontal overflow. A preview scroll reset keeps the dialog title/close control visible.
+
+Evidence: `tests/replies.test.ts`, `tests/reply-review.spec.ts` and ignored
+`.data/screenshots/*-reply-review*.png`. Earlier incomplete browser runs exposed
+test-locator mistakes and the narrow-screen scroll issue; the final full run
+passed after correction, not by ignoring failures or relaxing assertions.
+The development server can emit dependency-scan shutdown diagnostics during
+isolated security-test teardown; no backend assertion failed.
+
+No mail was delivered. Physical microphone/speaker behavior, native Alexa+,
+live Bedrock, a new live Ollama run, public HTTPS, final fresh-clone installation
+and independent user benefit were not verified in this change. Reply review
+does not require a model or an inbox connection. Verify the published release
+from a fresh checkout before submission.
 
 ### Case Command Speed Fix: October 19
 
@@ -770,12 +847,13 @@ evidence map, not a winning probability or promise of full marks.
 | --- | --- |
 | 0:00-0:15 | Open Maya's labelled fictional case. "MobilityRelay is a simulated Alexa+ repair assistant with a real MCP server. The supplier reports sending an estimate; the insurer reports not locating it." |
 | 0:15-0:35 | Show both dated sources and the receipt question. "We don't decide who's at fault. We ask what information is missing." |
-| 0:35-1:00 | Say/type "Prepare a request to the supplier." Show the real MCP trace and source-backed draft. Disclose text fallback if used. |
-| 1:00-1:25 | Show disabled approval/send, review recipient and wording, then approve. "This is local capture, not email delivery." The question remains open. |
-| 1:25-1:45 | "Remind me tomorrow." Show the saved due item and reload persistence. Do not promise background messaging. |
-| 1:45-2:10 | Switch to coverage refusal or technician shortage. Show a request for a written reason/availability, not a diagnosis or promised repair. |
-| 2:10-2:30 | Export and open a redacted HTML case pack with sources and unresolved questions. |
-| 2:30-2:45 | Show six tools/protocol evidence. Cite the 301-person study. "We target clearer coordination, not proven faster repairs." |
+| 0:35-0:55 | Prepare an initial receipt request using the question's control. Show real `prepare_repair_request` trace and exact source-backed wording. Leave it unapproved. |
+| 0:55-1:20 | Say/type "The insurer replied: We received the estimate. Reference AB-47. Authorization is still pending." Label this a fictional reply. Confirm source/date, add the reply reference and open Preview changes. No evidence is saved yet. |
+| 1:20-1:40 | Show the exact receipt quotation. Select the receipt answer and explicitly confirm. "Received is not approved. Authorization is still unanswered." Show the real `record_repair_event` trace and persistent What changed summary. |
+| 1:40-2:00 | Open the old request: approval is disabled. Prepare a fresh draft from current questions; show authorization included and receipt excluded. Nothing is sent automatically. |
+| 2:00-2:20 | Review and approve the fresh draft: "This is local capture, not email delivery." Then say "Remind me tomorrow" and show the saved local due item. |
+| 2:20-2:35 | Export a redacted HTML history with sources, the reviewed answer and remaining authorization question. |
+| 2:35-2:45 | Cite the 301-person study. "Six real MCP tools; user-reviewed information, not a promise of approval, faster repairs or supplier response." |
 
 Use only features that actually work. Do not pass fixtures off as real records,
 capture off as delivery, or optional Bedrock code off as tested AWS use. For local
@@ -838,6 +916,7 @@ positives, friction and whether we would use the tool again.
 | Oct 14: MCP/Express HTTP framing | Raw TCP saw chunked headers without matching chunks despite local content-length metadata; normalization cause unknown. POST-only fix missed error paths. | Uniform `on-headers` hook and native chunks. Suggest success/error framing tests and no write retries. | `scripts/verify-http-framing.ts`, `tests/http.test.ts`; status paths 200/202/405/401/403/400. |
 | Oct 15: Ollama/qwen2.5:1.5b | A live run missed the reminder write and generated an unsupported authorization prediction. These are model/application integration observations, not a proven Ollama-runtime defect. | Trusted short-command routing and structured case-read rendering; suggest small-model examples that test actual writes and unsupported factual claims, not just HTTP success. | `tests/agent.test.ts`, `scripts/verify-ollama.ts`; seven-scenario rerun passed with fictional data. |
 | Oct 19: application command routing | The host waited for model interpretation before returning a structured case brief or standard HTML export: 47.9/39.9 seconds in local API probes. This was application overhead, not a demonstrated MCP/Ollama defect. | Route exact supported commands through real MCP without inference; retain inference for draft selection and ambiguous requests. Suggest documenting separate tool, model and browser timings. | `scripts/verify-performance.ts`, `tests/agent.test.ts`, `tests/http.test.ts`; same API probes now 158/224 ms, with local spot-check limits above. |
+| Oct 20: application reply review / React / Playwright | Inspection found that the old stale-draft button reused old question IDs/body. A 320px screenshot also showed the preview retaining an offscreen title. New exact-label test selectors failed on populated nested controls; this was test code, not a proven vendor defect. | Fresh drafts now select current questions, preview resets scroll without stealing focus, and tests use accessible roles/names. Suggest testing before/after review, rejected saves and narrow-screen transitions together. | `server/replies.ts`, `tests/replies.test.ts`, `tests/reply-review.spec.ts`; fictional cases only, no delivered mail or independent user feedback. |
 | Pending: Bedrock | No real account/model-enabled run observed. | Record access, tool use, latency/cost only after a controlled live test. No live AWS qualification claimed. | Optional `server/agent.ts` adapter, not live evidence. |
 | Pending: SMTP provider | No real provider delivery test observed. | Keep capture labels; record TLS setup, acceptance/error and receipt separately after testing. | No provider feedback claimed yet. |
 

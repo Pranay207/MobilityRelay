@@ -6,7 +6,7 @@ import type { ToolCaller } from './mcp.js';
 import { mcpCatalog } from './mcp.js';
 import { AppError } from './store.js';
 import { toolSchemas, type ToolName } from './schemas.js';
-import { commandText, directCaseCommand, localIntent, proposesTomorrow, proposeUpdate, requestQuestionKinds } from './intents.js';
+import { commandText, directCaseCommand, localIntent, proposesTomorrow, proposeReply, proposeUpdate, requestQuestionKinds } from './intents.js';
 import { ollamaConverse } from './ollama.js';
 
 export type { AgentReply } from '../shared/types.js';
@@ -22,6 +22,10 @@ export async function respond(input: { caseId: string; text: string; allowCloud:
     return { reply: statuses.length ? `Recorded requests in this case: ${statuses.join('; ')}. Open Requests to review the exact message. Capture is not delivery, and SMTP acceptance is not proof of receipt.` : 'There are no recorded requests in this case. This does not establish what another person may have sent outside MobilityRelay.', traces };
   }
   if (intent === 'blocked') return { reply: 'I have not changed this case. Use the relevant follow-up control to cancel an existing reminder.', traces };
+  if (intent === 'reply') {
+    const update = proposeReply(input.text, brief);
+    return { reply: 'Review the reply, its source and any proposed answers. Nothing is saved or answered until you explicitly confirm the review.', action: 'reply', prefill: update.text, update, traces };
+  }
   if (intent === 'record') {
     const update = proposeUpdate(input.text, brief);
     return { reply: 'Review the source, date, and reported situation before saving this update. Suggested fields are not verified facts.', action: 'record', prefill: update.text, update, traces };

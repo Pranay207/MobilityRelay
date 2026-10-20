@@ -42,10 +42,14 @@ app or a population estimate for all wheelchair users.
 - **Keep the history:** record attributed, dated updates; corrections preserve the original source.
 - **Find the next question:** show missing information and the reports behind it, not a verdict about who is wrong.
 - **Review before acting:** prepare a source-backed draft and approve the exact recipient and message. Default mode captures it locally, not by email.
+- **Review what changed:** paste a reply or say "The insurer replied: ..."; inspect exact supporting quotations and a before/after preview, then explicitly select and confirm answers. Receipt can be answered while authorization stays pending; stale drafts require a fresh request.
 - **Hand over the case:** save persistent follow-ups and export an HTML/JSON history with optional known-identity redaction.
 
 Speech input and spoken replies are optional; text and forms remain available.
 Follow-ups are local due items, not autonomous messages or background reminders.
+Reply recognition is deliberately narrow and rule-based, not general email
+understanding. Ambiguous replies remain evidence only; no inbox connection or
+independent verification is claimed.
 
 ## Real MCP, Reviewed Actions
 
@@ -60,7 +64,7 @@ covered by wire tests.
 
 | MCP tool | Purpose |
 | --- | --- |
-| `record_repair_event` | Save a user-reviewed, attributed update. |
+| `record_repair_event` | Save reviewed evidence and explicitly selected, source-backed reply answers. |
 | `get_repair_brief` | Read the history, unanswered questions and next steps. |
 | `prepare_repair_request` | Prepare a draft without sending it. |
 | `send_approved_request` | Attempt only the exact message with valid user approval. |
@@ -102,17 +106,18 @@ environment variables, Windows installation guidance and optional integrations.
 
 ## Verification
 
-Latest code recheck: **October 19, 2026**, including the working-tree command
-responsiveness fix. Tests used isolated fictional records on Windows / Node
-24.11.0. The earlier fresh GitHub checkout covered `5e744c2`, before this fix.
+Latest working-tree recheck: **October 20, 2026**, including reviewed replies
+and fresh-request rebuilding. Tests used isolated fictional records on Windows /
+Node 24.11.0. Final GitHub checkout verification is still needed after publishing;
+the earlier clean-clone check covered `5e744c2`.
 
 | Check | Result |
 | --- | --- |
-| Backend tests | 121 passed, including fast routing, cloud-consent, approval, redaction and SMTP checks |
-| Desktop/mobile-emulation browser tests | All 48 passed in one 8.4-minute run; no retries or skips |
+| Backend tests | 146 passed, including 25 new reply-review, rollback, provenance, stale-preview and real HTTP/MCP checks |
+| Desktop/mobile-emulation browser tests | All 60 passed in one 5.3-minute run; no retries or skips |
 | TypeScript and production build | Passed |
 | Automated accessibility | No detected violations in tested views, review dialogs and sign-in screens; keyboard-focus checks passed |
-| Actual local AI + MCP | Seven-scenario Ollama-mode API workflow and real-model desktop review/mobile conversation checks passed |
+| Actual local AI + MCP | October 19: seven-scenario Ollama-mode API workflow and real-model desktop review/mobile conversation checks passed; reply review itself uses trusted rules, not inference |
 | Production Docker image | Earlier image passed isolated checks; the latest SMTP setup has not been container-retested |
 | Clean source installation | Fresh GitHub clone of `5e744c2` and empty-cache `npm ci` passed without local credentials or case records; repeat final checkout verification after pushing the fix |
 | Dependency audit | Zero known vulnerabilities reported on October 19 |
