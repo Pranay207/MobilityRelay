@@ -106,21 +106,21 @@ environment variables, Windows installation guidance and optional integrations.
 
 ## Verification
 
-Latest working-tree recheck: **October 20, 2026**, including reviewed replies
-and fresh-request rebuilding. Tests used isolated fictional records on Windows /
-Node 24.11.0. Final GitHub checkout verification is still needed after publishing;
-the earlier clean-clone check covered `5e744c2`.
+Latest release check: **October 20, 2026**. Published implementation `40b4da8`
+was cloned from GitHub into a new temporary directory and installed with an
+empty npm cache, without local settings or case records. Tests used fictional
+data on Windows / Node 24.11.0 / installed Edge.
 
 | Check | Result |
 | --- | --- |
 | Backend tests | 146 passed, including 25 new reply-review, rollback, provenance, stale-preview and real HTTP/MCP checks |
-| Desktop/mobile-emulation browser tests | All 60 passed in one 5.3-minute run; no retries or skips |
+| Desktop/mobile-emulation browser tests | All 60 passed from the fresh GitHub checkout in 7.8 minutes; no retries or skips |
 | TypeScript and production build | Passed |
 | Automated accessibility | No detected violations in tested views, review dialogs and sign-in screens; keyboard-focus checks passed |
 | Actual local AI + MCP | October 19: seven-scenario Ollama-mode API workflow and real-model desktop review/mobile conversation checks passed; reply review itself uses trusted rules, not inference |
 | Production Docker image | Earlier image passed isolated checks; the latest SMTP setup has not been container-retested |
-| Clean source installation | Fresh GitHub clone of `5e744c2` and empty-cache `npm ci` passed without local credentials or case records; repeat final checkout verification after pushing the fix |
-| Dependency audit | Zero known vulnerabilities reported on October 19 |
+| Clean source installation | `40b4da8`: empty-cache `npm ci` installed 265 packages; production build and all backend/browser tests passed; tracked checkout stayed clean |
+| Dependency audit | Zero known vulnerabilities reported on October 20; TLS verification stayed enabled |
 
 ```sh
 npm run check

@@ -385,6 +385,28 @@ not establish the native toolkit's sub-500 ms query target.
 
 ## 4. Testing and Latest Results
 
+### Published Release Check: October 20
+
+Verified implementation **`40b4da8`** from an actual GitHub clone, not the
+original working directory. The new temporary checkout initially contained no
+`.env`, `.data`, `.private` or `node_modules`. No private settings, dependencies
+or case database were copied into it. A documentation-only follow-up records
+these results; it does not change the tested implementation.
+
+| Check | Observed result |
+| --- | --- |
+| Clean installation | Empty-cache `npm ci` installed 265 packages in 51 seconds. Windows system-CA guidance was used; strict TLS remained enabled and certificate rejection was not disabled. |
+| Build and backend | Production bundle and all **146 tests passed**, with no failures or skips. |
+| Browser workflows | All **60 desktop/mobile-emulation tests passed in one 7.8-minute run**, without retries or skips. |
+| Interface checks | Exact-quote reply review, stale approval, fresh drafting, reload persistence, controlled English speech, keyboard focus, axe and responsive checks passed; fresh-checkout screenshots were inspected. |
+| Source hygiene | The cloned tracked tree stayed clean after generated test files. `.env` and private case storage were absent. npm reported **zero known vulnerabilities**, not a security guarantee. |
+| Repository access | Authenticated GitHub API confirmed the repository remains **private**, with an MIT license. Reviewer invitations/acceptance must be checked separately; a successful owner clone does not prove judge access. |
+
+The local read-burst spot check during overlapping test activity reported a
+536 ms median and 1,231 ms p95. These are host/load-specific observations, not
+native Alexa+ latency certification or a production SLA. All data was fictional;
+no live email, Bedrock, native Alexa+ or independent user-benefit test is claimed.
+
 ### Reviewed Reply Workflow: October 20
 
 Final working-tree verification passed the production build, **146 backend
@@ -409,10 +431,9 @@ The development server can emit dependency-scan shutdown diagnostics during
 isolated security-test teardown; no backend assertion failed.
 
 No mail was delivered. Physical microphone/speaker behavior, native Alexa+,
-live Bedrock, a new live Ollama run, public HTTPS, final fresh-clone installation
-and independent user benefit were not verified in this change. Reply review
-does not require a model or an inbox connection. Verify the published release
-from a fresh checkout before submission.
+live Bedrock, a new live Ollama run, public HTTPS and independent user benefit
+remain unverified. The published implementation's fresh installation is now
+verified above. Reply review does not require a model or an inbox connection.
 
 ### Case Command Speed Fix: October 19
 
@@ -814,8 +835,7 @@ Focus on completing evidence and submission, not adding unrelated features.
 - [ ] Confirm reviewer access/invitations and submission fields. One reviewer invitation may not cover all requirements. For a private repo, check the current required reviewer list and accepted invitations; otherwise verify public access and detectable licensing.
 - [ ] Publish an English video under three minutes, with fictional data and honest integration labels.
 - [ ] Submit feedback for every relevant product actually used; fill the log below as observations happen.
-- [x] Verify the pushed version from a fresh checkout (`5e744c2`, October 19); repeat relevant checks after further code changes.
-- [ ] After pushing the speed fix, verify the final GitHub revision for submission. The earlier checkout does not cover uncommitted fixes.
+- [x] Verify the published implementation from a fresh GitHub checkout (`40b4da8`, October 20): clean install, build, 146 backend tests and 60 browser tests passed. Repeat relevant checks if implementation changes again.
 - [ ] Optional: deploy over HTTPS with persistent storage and test auth/TLS/end-to-end behavior. The app image smoke test passes; verify the complete Ollama Compose stack if using it.
 - [ ] Optional AWS Builder: actually validate Bedrock and current bonus eligibility before claiming it. Code alone is not live use.
 - [ ] Optional Open Source: keep MIT licensing and check the mini-challenge separately; a license alone may not satisfy additional contribution requirements.
