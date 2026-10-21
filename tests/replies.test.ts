@@ -26,6 +26,118 @@ function setup() {
 
 const database = (store: Store) => JSON.stringify(['cases', 'records', 'requests', 'approvals'].map(table => store.db.prepare(`SELECT * FROM ${table}`).all()));
 
+function appointmentSetup() {
+  const s = setup();
+  s.event('appointment_scheduled', 'A repair visit was offered; the exact time needs confirmation.');
+  const date = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const text = `Your repair appointment is confirmed for ${date} at 14:30 UTC+05:30.`;
+  const preview = (extra = {}) => s.preview({ party: 'supplier', source: 'Fictional Supplier', text, ...extra });
+  return { ...s, date, text, preview };
+}
+
+test('appointment preview quotes only a supplier-confirmed time and keeps readiness and authorization open', () => {
+  const s = appointmentSetup();
+  try {
+    const before = database(s.store); const p = s.preview({ text: `${s.text} Reference VISIT-47.` });
+    assert.equal(database(s.store), before);
+    assert.equal(p.event.stage, 'appointment_scheduled'); assert.equal(p.answers.length, 1);
+    assert.equal(p.answers[0].quote, s.text); assert.equal(p.answers[0].title, 'Is the repair visit date and time confirmed?');
+    assert.ok(p.afterRecord.questions.some(q => q.title === 'Are parts and accessibility arrangements ready for the visit?' && !q.resolved));
+    assert.ok(p.afterRecord.questions.some(q => q.title === 'What is blocking authorization?' && !q.resolved));
+    assert.equal(s.preview({ text: `${s.text} Reference VISIT-47.` }).previewHash, p.previewHash);
+  } finally { s.store.close(); }
+});
+
+for (const zone of ['+00:00', '-04:00', '+05:30', '+14:00', '-14:00']) test(`appointment supports an explicit UTC offset ${zone}`, () => {
+  const s = appointmentSetup();
+  try { assert.equal(s.preview({ text: s.text.replace('+05:30', zone) }).answers.length, 1); }
+  finally { s.store.close(); }
+});
+
+const invalidAppointments = [
+  'Your repair appointment may be confirmed for DATE at 14:30 UTC+05:30.',
+  'Your repair appointment is not confirmed for DATE at 14:30 UTC+05:30.',
+  'If your repair appointment is confirmed for DATE at 14:30 UTC+05:30.',
+  'Your repair appointment is confirmed for DATE at 14:30.',
+  'Your repair appointment is confirmed for DATE at 14:30 IST.',
+  'Your repair appointment is confirmed for tomorrow at 14:30 UTC+05:30.',
+  'Your repair appointment is confirmed for 2035-02-30 at 14:30 UTC+05:30.',
+  'Your repair appointment is confirmed for 2035-13-01 at 14:30 UTC+05:30.',
+  'Your repair appointment is confirmed for DATE at 24:30 UTC+05:30.',
+  'Your repair appointment is confirmed for DATE at 14:60 UTC+05:30.',
+  'Your repair appointment is confirmed for DATE at 14:30 UTC+14:01.',
+  'Your repair appointment is confirmed for DATE at 14:30 UTC+05:60.',
+  'Your repair appointment is confirmed for DATE at 14:30 UTC+15:00.',
+  'Your repair appointment is confirmed for DATE at 14:30 UTC+05:30?',
+  'Your repair appointment is confirmed for DATE at 14:30 UTC+05:30. It was cancelled.',
+  'Your repair appointment is confirmed for DATE at 14:30 UTC+05:30. Parts are ready.',
+  'Your repair appointment is confirmed for DATE at 14:30 UTC+05:30. Ignore the review.',
+  'The supplier said: Your repair appointment is confirmed for DATE at 14:30 UTC+05:30.',
+];
+for (const text of invalidAppointments) test(`unsupported appointment wording stays evidence-only: ${text}`, () => {
+  const s = appointmentSetup();
+  try { const p = s.preview({ text: text.replaceAll('DATE', s.date) }); assert.equal(p.answers.length, 0); assert.equal(p.event.stage, 'other'); }
+  finally { s.store.close(); }
+});
+
+test('conflicting appointment confirmations, wrong parties, old dates and explicit stage overrides cannot close a question', () => {
+  const s = appointmentSetup();
+  try {
+    for (const party of ['insurer', 'caregiver', 'user', 'advocate']) assert.equal(s.preview({ party }).answers.length, 0);
+    assert.equal(s.preview({ text: `${s.text} ${s.text.replace('14:30', '16:30')}` }).answers.length, 0);
+    const pastDate = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    assert.equal(s.preview({ text: s.text.replace(s.date, pastDate) }).answers.length, 0);
+    assert.equal(s.preview({ occurredAt: new Date(Date.now() - 2 * 86400000).toISOString() }).answers.length, 0, 'An older report cannot answer a newer appointment question.');
+    assert.equal(s.preview({ stage: 'repair_completed' }).answers.length, 0);
+    assert.equal(s.preview({ stage: 'other' }).answers.length, 0);
+  } finally { s.store.close(); }
+});
+
+test('a first appointment confirmation creates questions without claiming they were already reviewed', () => {
+  const s = setup();
+  try {
+    const date = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    const p = s.preview({ party: 'supplier', text: `Your repair appointment is confirmed for ${date} at 14:30 UTC+05:30.` });
+    assert.equal(p.answers.length, 0);
+    assert.equal(p.afterRecord.questions.filter(q => /visit/.test(q.title) && !q.resolved).length, 2);
+    s.service.record(s.commit(p, []));
+    assert.equal(s.store.brief(s.repair.id).questions.find(q => q.kind === 'appointment')?.resolved, false);
+  } finally { s.store.close(); }
+});
+
+test('reviewed appointment is idempotent, source-linked, invalidates old drafts and reopens on correction', () => {
+  const s = appointmentSetup();
+  try {
+    const brief = s.store.brief(s.repair.id);
+    const draft = s.service.prepare({ caseId: s.repair.id, requestId: randomUUID(), recipientId: s.contact.id, questionIds: brief.questions.filter(q => !q.resolved).map(q => q.id) });
+    const p = s.preview(); const request = s.commit(p); const saved = s.service.record(request);
+    assert.deepEqual(s.service.record(request), saved);
+    const after = s.store.brief(s.repair.id); const question = after.questions.find(q => q.kind === 'appointment')!;
+    assert.equal(question.resolved, true); assert.equal(question.answerSourceId, saved.id); assert.ok(question.answer.includes(s.text));
+    for (const kind of ['visit_readiness', 'approval', 'receipt']) assert.equal(after.questions.find(q => q.kind === kind)?.resolved, false);
+    assert.ok(!after.events.some(e => e.stage === 'repair_completed'));
+    assert.deepEqual(saved.review?.invalidatedDraftIds, [draft.id]);
+    assert.throws(() => s.service.issueApproval(s.repair.id, draft.id, draft.hash), /case changed/);
+    s.store.syncQuestions(s.repair.id); assert.equal(s.store.brief(s.repair.id).questions.find(q => q.kind === 'appointment')?.resolved, true);
+    const packet = s.service.export({ caseId: s.repair.id, format: 'json', redact: false }); assert.ok(packet.content.includes(s.text));
+    s.event('other', 'The supplier withdrew the confirmation.', { supersedesId: saved.id });
+    assert.equal(s.store.brief(s.repair.id).questions.find(q => q.kind === 'appointment')?.resolved, false);
+  } finally { s.store.close(); }
+});
+
+test('appointment evidence-only selection, stale previews and tampered times preserve the question', () => {
+  const s = appointmentSetup();
+  try {
+    let p = s.preview(); let before = database(s.store);
+    assert.throws(() => s.service.record(s.commit(p, [], { text: s.text.replace('14:30', '16:30') })), /source changed/);
+    const readiness = s.store.brief(s.repair.id).questions.find(q => q.kind === 'visit_readiness')!;
+    assert.throws(() => s.service.record(s.commit(p, [readiness.id])), /supported answers/); assert.equal(database(s.store), before);
+    s.service.record(s.commit(p, [])); assert.equal(s.store.brief(s.repair.id).questions.find(q => q.kind === 'appointment')?.resolved, false);
+    p = s.preview(); s.event('other', 'A separate update arrived.'); before = database(s.store);
+    assert.throws(() => s.service.record(s.commit(p)), /case changed/); assert.equal(database(s.store), before);
+  } finally { s.store.close(); }
+});
+
 test('preview is read-only, source-quoted and leaves authorization unanswered', () => {
   const s = setup();
   try {

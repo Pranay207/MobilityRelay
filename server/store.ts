@@ -127,7 +127,10 @@ export class Store {
     if (latest('parts_delayed')) add('parts', 'When will the part be available?', 'Request the part reference, availability, expected arrival, and next update date.', [latest('part_ordered'), latest('parts_delayed')]);
     if (latest('technician_unavailable')) add('technician', 'What assessment or repair arrangements are available?', 'Ask for the next available professional, alternative arrangements, and a named coordinator.', [latest('technician_unavailable')]);
     if (latest('assessment_needed')) add('assessment', 'Who can arrange a professional assessment?', 'Describe the reported problem and request an assessment. Do not attempt mechanical diagnosis or repairs.', [latest('assessment_needed')]);
-    if (latest('appointment_scheduled')) add('appointment', 'Is the repair visit confirmed?', 'Confirm the date, accessibility needs, and whether required parts will be ready.', [latest('appointment_scheduled')]);
+    if (latest('appointment_scheduled')) {
+      add('appointment', 'Is the repair visit date and time confirmed?', 'Request the exact date, time and time zone from the supplier. A reported appointment is not a completed repair.', [latest('appointment_scheduled')]);
+      add('visit_readiness', 'Are parts and accessibility arrangements ready for the visit?', 'Confirm required parts and accessibility arrangements separately. A confirmed time does not establish readiness.', [latest('appointment_scheduled')]);
+    }
     if (latest('provider_silent')) add('response', 'Who can respond to this request?', 'Ask for a named contact and a response date. A case history can be shared with a chosen advocate.', [latest('provider_silent')]);
     if (latest('loaner_needed')) add('loaner', 'Is suitable temporary equipment available?', 'Ask about availability, professional suitability assessment, and any cost or funding requirements.', [latest('loaner_needed')]);
     // Retain question history without treating corrected reports as current evidence.

@@ -13,7 +13,7 @@ server over Streamable HTTP. Native Alexa+ integration is not claimed.
 [Quick Start](#quick-start) | [How It Works](#how-it-works) |
 [Verification](#verification) | [Project Guide](docs/project-guide.md)
 
-![MobilityRelay workspace showing two attributed repair reports, unanswered questions and the Alexa+ experience simulator](assets/workspace.png)
+![MobilityRelay task-first workspace showing the current repair question, review controls and the Alexa+ experience simulator](assets/workspace.png)
 
 *Actual application screenshot using fictional records and the local command
 simulator, not native Alexa+ or a live supplier integration.*
@@ -40,7 +40,7 @@ app or a population estimate for all wheelchair users.
 **Record -> clarify -> prepare -> approve -> follow up -> export**
 
 - **Keep the history:** record attributed, dated updates; corrections preserve the original source.
-- **Find the next question:** show missing information and the reports behind it, not a verdict about who is wrong.
+- **Find the next question:** the current question and request action come first; supporting reports expand on demand. Show missing information, not a verdict about who is wrong.
 - **Review before acting:** prepare a source-backed draft and approve the exact recipient and message. Default mode captures it locally, not by email.
 - **Review what changed:** paste a reply or say "The insurer replied: ..."; inspect exact supporting quotations and a before/after preview, then explicitly select and confirm answers. Receipt can be answered while authorization stays pending; stale drafts require a fresh request.
 - **Hand over the case:** save persistent follow-ups and export an HTML/JSON history with optional known-identity redaction.
@@ -48,7 +48,10 @@ app or a population estimate for all wheelchair users.
 Speech input and spoken replies are optional; text and forms remain available.
 Follow-ups are local due items, not autonomous messages or background reminders.
 Reply recognition is deliberately narrow and rule-based, not general email
-understanding. Ambiguous replies remain evidence only; no inbox connection or
+understanding. It supports insurer receipt statements and supplier appointment
+confirmations with an explicit date, time and UTC offset. A visit time can answer
+an existing scheduling question after review; parts and accessibility readiness
+stay separate. Ambiguous replies remain evidence only; no inbox connection or
 independent verification is claimed.
 
 ## Real MCP, Reviewed Actions
@@ -106,15 +109,16 @@ environment variables, Windows installation guidance and optional integrations.
 
 ## Verification
 
-Latest release check: **October 20, 2026**. Published implementation `40b4da8`
-was cloned from GitHub into a new temporary directory and installed with an
-empty npm cache, without local settings or case records. Tests used fictional
-data on Windows / Node 24.11.0 / installed Edge.
+Latest working-tree verification: **October 21, 2026**, including the task-first
+layout and supplier appointment review. Tests used isolated fictional data on
+Windows / Node 24.11.0 / installed Edge. The earlier published implementation
+`40b4da8` also passed a clean GitHub checkout and empty-cache installation on
+October 20; that installation check does not cover the newer changes.
 
 | Check | Result |
 | --- | --- |
-| Backend tests | 146 passed, including 25 new reply-review, rollback, provenance, stale-preview and real HTTP/MCP checks |
-| Desktop/mobile-emulation browser tests | All 60 passed from the fresh GitHub checkout in 7.8 minutes; no retries or skips |
+| Backend tests | All 174 passed, including appointment validation, reply review, rollback, provenance, stale-preview and real HTTP/MCP checks |
+| Desktop/mobile-emulation browser tests | All 68 passed in one 9.3-minute working-tree run; no retries or skips |
 | TypeScript and production build | Passed |
 | Automated accessibility | No detected violations in tested views, review dialogs and sign-in screens; keyboard-focus checks passed |
 | Actual local AI + MCP | October 19: seven-scenario Ollama-mode API workflow and real-model desktop review/mobile conversation checks passed; reply review itself uses trusted rules, not inference |
@@ -125,6 +129,7 @@ data on Windows / Node 24.11.0 / installed Edge.
 ```sh
 npm run check
 npm run test:browser
+npm run measure:usefulness
 ```
 
 Browser tests require installed Microsoft Edge. Results use isolated fictional

@@ -4,6 +4,50 @@ import { mkdir, writeFile } from 'node:fs/promises';
 
 const viewTab = (page: Page, name: string) => page.getByRole('tab', { name: name === 'Requests' ? /^Requests(?: \d+)?$/ : name, exact: true });
 
+test('next action and Relay input fit the first screen across desktop, tablet and mobile', async ({ page }, info) => {
+  test.setTimeout(120000);
+  for (const viewport of [{ width: 1248, height: 680 }, { width: 1440, height: 900 }, { width: 768, height: 900 }, { width: 390, height: 844 }, { width: 1366, height: 600 }]) {
+    await page.setViewportSize(viewport); await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+    const next = page.locator('.question-item.next-step');
+    const prepare = next.getByRole('button', { name: 'Prepare a request', exact: true });
+    await expect(prepare).toBeInViewport({ ratio: 1 });
+    await expect(prepare).toHaveCSS('background-color', 'rgb(22, 100, 78)');
+    const reports = page.getByRole('region', { name: 'Reported paperwork sources', exact: true });
+    await expect(reports.locator('details')).not.toHaveAttribute('open', '');
+    const above = await next.boundingBox(); const below = await reports.boundingBox(); expect(above!.y).toBeLessThan(below!.y);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    if (viewport.width <= 1000 || viewport.height <= 600) await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+    const input = page.getByRole('textbox', { name: 'Message to Relay', exact: true });
+    await expect(input).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeInViewport({ ratio: 1 });
+    const beforeScroll = await page.evaluate(() => scrollY);
+    await input.fill('What is the next step?');
+    await page.getByRole('button', { name: 'Send message', exact: true }).click();
+    await expect(page.locator('.message-assistant').last()).toContainText('user-maintained record');
+    await expect(page.locator('.message-assistant').last().locator('p')).toBeInViewport({ ratio: 0.1 });
+    await expect(input).toBeInViewport({ ratio: 1 });
+    expect(await page.evaluate(() => scrollY)).toBe(beforeScroll);
+    expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()).violations).toEqual([]);
+    await page.screenshot({ path: `.data/screenshots/${info.project.name}-task-first-${viewport.width}x${viewport.height}.png` });
+  }
+});
+
+test('supporting reports expand by keyboard and retain source navigation', async ({ page }) => {
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  const reports = page.getByRole('region', { name: 'Reported paperwork sources', exact: true });
+  const summary = reports.locator('summary'); await summary.focus(); await page.keyboard.press('Enter');
+  await expect(reports.getByText('Supplier report', { exact: true })).toBeVisible();
+  await reports.getByRole('button', { name: 'View supplier source', exact: true }).click();
+  await expect(page.locator('.evidence.highlighted')).toContainText('Northbridge Mobility');
+  await page.getByRole('tab', { name: 'Overview', exact: true }).click();
+  const recent = page.locator('.evidence-disclosure');
+  await expect(recent.locator('.evidence').first()).not.toBeVisible();
+  await recent.locator(':scope > summary').focus(); await page.keyboard.press('Enter');
+  await expect(recent.locator('.evidence').first()).toBeVisible();
+  await page.keyboard.press('Enter'); await expect(recent.locator('.evidence').first()).not.toBeVisible();
+});
+
 async function checkBrand(page: Page) {
   const brand = page.locator('.brand');
   await expect(brand.locator('.brand-name')).toHaveText('MobilityRelay');

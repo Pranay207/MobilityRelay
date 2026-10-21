@@ -58,6 +58,14 @@ repair tracking is new or that this approach is globally unique.
 5. Approve the exact message. Default mode captures it locally, not by email.
 6. Track a follow-up, record a response or correction, and export the case pack.
 
+Overview puts the current unanswered question and **Prepare a request** ahead of
+supporting reports. Expand **Reported paperwork updates** or **Recent evidence**
+when needed; **Evidence** always retains the full history. The compact case
+header keeps the record readable without taking over the first screen. Relay
+fits the remaining desktop height, with its message input fixed inside the
+panel. On tablet/mobile or short windows, the labelled **Relay** button opens
+the conversation in a dialog. Chat scrolling stays inside the conversation.
+
 ### Review a Reply: What Changed?
 
 Use **Review reply**, or say/type **"The insurer replied: We received the
@@ -79,11 +87,28 @@ opens current question/recipient selection instead of reusing old wording.
 
 Recognition is deliberately narrow: an affirmative insurer sentence such as
 "We received the estimate." can propose a receipt answer; explicit pending
-authorization can suggest that situation. Negated, conditional, conflicting,
-unsupported and ambiguous wording proposes no answer. Other reply kinds can be
+authorization can suggest that situation. A supplier reply such as **"Your
+repair appointment is confirmed for 2026-10-28 at 14:30 UTC+05:30."** can propose
+an answer to an existing open visit-date-and-time question. The exact quotation
+is shown; nothing is selected or saved automatically. Use a valid calendar
+date, 24-hour time and explicit UTC offset, with the visit after the report time.
+An optional `Reference VISIT-47.` sentence is accepted, but references still
+need manual entry in the reference field. This is intentionally a strict format,
+not general natural-language scheduling or a calendar integration.
+
+Appointment time and parts/accessibility readiness are separate questions.
+Confirming time does not answer readiness, authorization or repair completion.
+A first appointment report creates those open questions; answering a newly
+created question uses the existing manual review form. Automatic answer proposals
+only target existing open questions. Older replies cannot answer a newer visit
+question. Corrections to the answer source reopen it; old draft approvals remain
+blocked after the case changes.
+
+Negated, conditional, conflicting, wrong-party, missing-time-zone, unsupported
+and ambiguous wording proposes no answer. Other reply kinds can be
 logged without answering anything, or answered with the existing manual review
 form. This is not general email NLP, autonomous inbox ingestion or independently
-verified receipt. Source text is always treated as data, never permission.
+verified receipt or appointment. Source text is always treated as data, never permission.
 
 Supported situations include missing paperwork, coverage refusals, unavailable
 parts or technicians, assessment requests, appointment delays, ignored requests
@@ -384,6 +409,63 @@ not establish the native toolkit's sub-500 ms query target.
 [Alexa+ quickstart](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-quickstart.html).
 
 ## 4. Testing and Latest Results
+
+### Task-First Workspace: October 21
+
+The final production build, **174 backend tests** and all **68 desktop/mobile
+browser tests passed**, with the browser suite completing in one 9.3-minute run
+without retries or skips. First-screen checks assert a fully visible request
+action and Relay input at 1248x680, 1440x900, 768x900, 390x844 and 1366x600 CSS
+pixels. They also check primary-action styling, no horizontal overflow, a visible
+new reply and no page-scroll jump after chat. Tablet/mobile and short windows
+use the labelled conversation dialog; desktop fits Relay to the available height.
+
+Supporting reports and recent evidence start collapsed, expand by keyboard and
+retain source navigation. Existing approval, correction, stale-draft, controlled
+speech, case-isolation, accessibility and long-field regressions still pass.
+Viewport screenshots were inspected and the README screenshot was refreshed.
+An initial focused run exposed a clipped action in a short window and an overly
+broad test selector; both were corrected before the final full run.
+
+The complete scripted fictional task also passed after the layout change:
+12.742 wall seconds / 11.058 summed step seconds, including the actual local
+capture adapter, reload and inspection of the downloaded export. Evidence:
+`.data/verification/usefulness-20261021145652/summary.json`. These are automation
+timings, not human completion times or a demonstrated usability improvement.
+No independent-user, physical-voice, live email, AWS or native Alexa+ validation
+is added by these checks. The earlier clean-install check remains historical.
+
+### Supplier Appointment Review: October 21
+
+Working-tree verification passed the production build and **174 backend tests**,
+including 28 additional appointment checks. The full browser run passed **63 of
+64 tests** in six minutes: one existing desktop long-field test timed out waiting
+for case navigation, before its layout assertions. Its failure screenshot showed
+the requested case after the wait; the cause is not proven. An unchanged targeted
+rerun passed all **six desktop/mobile checks** (that test plus both new appointment
+scenarios) in 1.7 minutes. Assertions/timeouts were not relaxed. This is not a
+claim of an uninterrupted 64/64 browser run.
+
+- Supplier-only, exact-format confirmation validates calendar date, 24-hour time,
+  UTC offset and a visit after the report time; older reports cannot answer newer
+  appointment questions.
+- Preview is read-only, quotes the source, starts unchecked and requires explicit
+  confirmation. Missing/invalid dates or time zones, wrong parties, conflicting
+  sentences and unsupported wording propose no answer.
+- Only the existing open visit-time question can be answered. Parts/accessibility
+  readiness and authorization remain open; no repair-completion event is inferred.
+- Source correction reopens the question. Duplicate saves are idempotent; stale
+  previews, edited times and unsupported answer selections are rejected. Old draft
+  approvals remain blocked after the update.
+- Both new browser scenarios passed in the full run and targeted rerun. Preview
+  screenshots at 320px and 1440px were inspected; dialog axe scans and overflow
+  assertions passed. Tests used isolated fictional data, local mode and capture.
+
+Evidence: `tests/replies.test.ts`, `tests/reply-review.spec.ts` and ignored
+`.data/screenshots/*-appointment-preview.png`. No new live email, Bedrock, native
+Alexa+, physical speech or independent user-benefit verification is claimed.
+The October 20 clean-checkout results below concern the earlier published code,
+not this later working-tree enhancement.
 
 ### Published Release Check: October 20
 
@@ -788,6 +870,60 @@ Ignored `.data/verification/fresh-usability-install.log`,
 `usability-ollama-ui.log`. Do not publish raw machine logs
 or trusted-root bundles as submission evidence.
 
+### Scripted Fictional Task: October 21
+
+**Agent-authored browser check, not independent user feedback or measured human
+usefulness.** Completed the real UI with isolated in-memory fictional records,
+Edge at 1440x1000, Asia/Kolkata, local command mode and the actual capture-only
+mail adapter. No network replies were mocked and all six MCP tools appeared in
+successful UI response traces. Startup/setup, human reading and decision time
+are excluded. Artifact inspection took place after the task clock stopped.
+
+| Final completed run | Scripted seconds |
+| --- | ---: |
+| Inspect both conflicting source reports | 0.628 |
+| Prepare an initial source-backed receipt request | 0.424 |
+| Review the insurer reply and answer only receipt | 0.825 |
+| Replace the stale request, review and approve local capture | 1.053 |
+| Save a due item and verify it after reload | 1.385 |
+| Download redacted HTML history | 0.814 |
+| Sum of timed steps | **5.129** |
+| Wall task time, including between-step screenshots | **6.184** |
+
+An earlier completed run took 7.355 wall seconds; two runs are not a latency
+distribution or a benchmark. **Do not present these automated times as a human
+completion time, time saved, or evidence of faster repairs.** No notes/email
+baseline, unfamiliar participant or wheelchair-user outcome was measured.
+
+Verified outcome: five retained events (including local capture), receipt
+answered with provenance, authorization still open, two requests (old draft and
+one captured follow-up), one persistent local due item and a downloaded HTML
+history. The export was rendered and inspected; original reports, reviewed
+receipt, unresolved authorization and message/follow-up history were retained.
+Sample known identities were absent, not proof of complete anonymization.
+The completed run had **zero unexpected UI/API failures** and no delivered email.
+
+Author-observed clarity risks, not participant complaints:
+- Requests stores messages, while Follow-ups stores due items; the terminology
+  needs an unfamiliar-user check.
+- A changed case requires fresh drafting and approval; these extra steps are
+  intentional safeguards, not errors to count as user mistakes.
+- Export message history calls the obsolete request `draft`, without the
+  workspace's `Stale draft` label. This could make the old request look current.
+- Exported messages cite numbered sources, while attributed-history entries show
+  UUIDs; matching citations is less direct than in the workspace.
+
+One earlier attempt failed because the new harness mistakenly rejected local
+capture along with external email. The harness was corrected to use
+`createMail({ MAIL_MODE: 'capture' })`; no application fix was required. This
+failed attempt is retained separately, not counted as a successful task or user
+mistake. Repeat with `npm run measure:usefulness`; timestamped JSON, screenshots
+and the actual downloaded HTML are saved under ignored
+`.data/verification/usefulness-*`. Final evidence is
+`usefulness-20261021093826/summary.json`; the first completed run is
+`usefulness-20261021093709`, and the failed harness attempt is
+`usefulness-20261021093620`.
+
 ### Manual Voice and User Checks
 
 Use fictional records. Grant microphone permission only if comfortable with the
@@ -830,6 +966,7 @@ Focus on completing evidence and submission, not adding unrelated features.
 - [x] Remove model waits for supported case reads and redacted HTML history exports; October 19 working-tree verification is recorded above.
 - [ ] Review broader model behavior and slow complex requests; the spot checks do not establish general accuracy or fast inference.
 - [ ] Recommended, not compulsory: complete an unfamiliar person's fictional task; record failures and feedback.
+- [x] Complete a scripted fictional UI task, record timings/clarity risks and inspect the actual export (October 21). This does not replace the unfamiliar-person check.
 - [ ] If claiming delivery, test SMTP to an inbox you control and distinguish acceptance from receipt. Otherwise keep capture labels.
 - [x] Recheck current rules and FAQ (October 19): the own-simulator route is accepted and public hosting is optional.
 - [ ] Confirm reviewer access/invitations and submission fields. One reviewer invitation may not cover all requirements. For a private repo, check the current required reviewer list and accepted invitations; otherwise verify public access and detectable licensing.
@@ -866,7 +1003,7 @@ evidence map, not a winning probability or promise of full marks.
 | Time | Show and say |
 | --- | --- |
 | 0:00-0:15 | Open Maya's labelled fictional case. "MobilityRelay is a simulated Alexa+ repair assistant with a real MCP server. The supplier reports sending an estimate; the insurer reports not locating it." |
-| 0:15-0:35 | Show both dated sources and the receipt question. "We don't decide who's at fault. We ask what information is missing." |
+| 0:15-0:35 | Expand Reported paperwork updates and show both dated sources and the receipt question. "We don't decide who's at fault. We ask what information is missing." |
 | 0:35-0:55 | Prepare an initial receipt request using the question's control. Show real `prepare_repair_request` trace and exact source-backed wording. Leave it unapproved. |
 | 0:55-1:20 | Say/type "The insurer replied: We received the estimate. Reference AB-47. Authorization is still pending." Label this a fictional reply. Confirm source/date, add the reply reference and open Preview changes. No evidence is saved yet. |
 | 1:20-1:40 | Show the exact receipt quotation. Select the receipt answer and explicitly confirm. "Received is not approved. Authorization is still unanswered." Show the real `record_repair_event` trace and persistent What changed summary. |

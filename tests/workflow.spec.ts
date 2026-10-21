@@ -176,6 +176,7 @@ for (const activity of ['chat reply', 'follow-up save'] as const) {
 test('simulator framing and paired reports expose source dates and real MCP calls', async ({ page }, info) => {
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
   const reports = page.getByRole('region', { name: 'Reported paperwork sources', exact: true });
+  await reports.locator('summary').click();
   await expect(reports).toBeVisible(); await expect(reports.getByText('Receipt question open', { exact: true })).toBeVisible();
   await expect(reports.getByText('Supplier report', { exact: true })).toBeVisible(); await expect(reports.getByText('Insurer report', { exact: true })).toBeVisible();
   await expect(reports).toContainText('We submitted the repair estimate to your insurer.');
@@ -229,6 +230,7 @@ test('paired reports use corrected evidence and disappear when the question is a
     if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open case navigation' }).click();
     await page.getByRole('button', { name: new RegExp(title) }).click(); await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
     const reports = page.getByRole('region', { name: 'Reported paperwork sources', exact: true });
+    await reports.locator('summary').click();
     await expect(reports).toContainText('Original fictional report: we cannot locate the estimate.');
     await reports.getByRole('button', { name: 'View insurer source', exact: true }).click();
     await page.locator('.evidence.highlighted').getByRole('button', { name: 'Correct source', exact: true }).click();

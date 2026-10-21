@@ -49,6 +49,7 @@ function WaitingStatus() {
 export function Assistant({ messages, busy, suspended = false, settings, onSend, onError }: { messages: ChatMessage[]; busy: boolean; suspended?: boolean; settings: Settings | null; onSend: (text: string, cloud: boolean) => Promise<void>; onError: (text: string) => void }) {
   const [text, setText] = useState(''); const [listening, setListening] = useState(false); const [sound, setSound] = useState(false); const [cloud, setCloud] = useState(false);
   const recognition = useRef<Recognition | null>(null); const end = useRef<HTMLDivElement>(null); const lastSpoken = useRef(messages.at(-1)?.id ?? '');
+  const panel = useRef<HTMLElement>(null);
   const Voice = (window as VoiceWindow).SpeechRecognition ?? (window as VoiceWindow).webkitSpeechRecognition;
   const cancelVoice = useCallback(() => {
     const voice = recognition.current; recognition.current = null;
@@ -57,7 +58,23 @@ export function Assistant({ messages, busy, suspended = false, settings, onSend,
     voice.onresult = null; voice.onerror = null; voice.onend = null;
     try { voice.abort(); } catch { /* The browser may already have ended this session. */ }
   }, []);
-  useEffect(() => { end.current?.scrollIntoView({ block: 'nearest' }); }, [messages.length, busy]);
+  useEffect(() => {
+    const log = end.current?.parentElement;
+    if (!log) return;
+    const anchor = busy ? log.querySelector('.working') : [...log.querySelectorAll('.message')].at(-1);
+    if (anchor) log.scrollTop += anchor.getBoundingClientRect().top - log.getBoundingClientRect().top - 12;
+    else log.scrollTop = 0;
+  }, [messages.length, busy]);
+  useEffect(() => {
+    const element = panel.current;
+    if (!element || element.closest('dialog')) return;
+    // Fit the composer below the actual header, including wrapped titles or notices.
+    const fit = () => element.style.setProperty('--relay-height', `${Math.max(200, Math.min(560, innerHeight - Math.max(12, element.getBoundingClientRect().top) - 16))}px`);
+    const observer = new ResizeObserver(fit);
+    for (const target of document.querySelectorAll('.workspace, .case-heading, .case-metrics, .topbar, .alert')) observer.observe(target);
+    window.addEventListener('resize', fit); window.addEventListener('scroll', fit, { passive: true }); fit();
+    return () => { observer.disconnect(); window.removeEventListener('resize', fit); window.removeEventListener('scroll', fit); };
+  }, []);
   useEffect(() => { if (busy || suspended) { cancelVoice(); setListening(false); } }, [busy, suspended, cancelVoice]);
   useEffect(() => { if (!sound || busy || suspended || listening) cancelSpeech(); }, [sound, busy, suspended, listening]);
   useEffect(() => {
@@ -85,7 +102,7 @@ export function Assistant({ messages, busy, suspended = false, settings, onSend,
     try { voice.start(); setListening(true); } catch { cancelVoice(); setListening(false); onError('The microphone could not start. Try again or use text.'); }
   };
   const submit = async (value: string) => { if (!value.trim() || busy || suspended) return; cancelVoice(); setListening(false); cancelSpeech(); const prior = text; setText(''); try { await onSend(value.trim(), cloud); } catch { setText(prior || value); } };
-  return <aside className="assistant" aria-label="Simulated Alexa+ repair conversation"><div className="assistant-heading"><div className="relay-icon"><AudioLines size={22} /></div><div><h2>Relay</h2><span className="simulator-label">Alexa+ experience simulator</span><span>{agentLabel(settings)}</span></div><IconButton label={sound ? 'Mute spoken responses' : 'Enable spoken responses'} onClick={() => { if (sound && 'speechSynthesis' in window) speechSynthesis.cancel(); setSound(!sound); }}><span>{sound ? <Volume2 size={19} /> : <VolumeX size={19} />}</span></IconButton></div>
+  return <aside ref={panel} className="assistant" aria-label="Simulated Alexa+ repair conversation"><div className="assistant-heading"><div className="relay-icon"><AudioLines size={22} /></div><div><h2>Relay</h2><span className="simulator-label">Alexa+ experience simulator</span><span>{agentLabel(settings)}</span></div><IconButton label={sound ? 'Mute spoken responses' : 'Enable spoken responses'} onClick={() => { if (sound && 'speechSynthesis' in window) speechSynthesis.cancel(); setSound(!sound); }}><span>{sound ? <Volume2 size={19} /> : <VolumeX size={19} />}</span></IconButton></div>
     <div className="conversation" role="log" aria-label="Repair conversation" aria-live="polite">
       {!messages.length && <div className="assistant-empty"><AudioLines size={28} /><h3>Your repair, one next step.</h3><p>Case record connected</p></div>}
       {messages.map(message => <div key={message.id} className={`message message-${message.role}`}><span className="message-author">{message.role === 'assistant' ? 'Relay' : 'You'}</span><p>{message.text}</p>{message.traces.length > 0 && <details className="tool-trace"><summary><Terminal size={12} /> {message.traces.length} MCP {message.traces.length === 1 ? 'call' : 'calls'}</summary>{message.traces.map((t, i) => <div key={i}><span>{t.tool}</span><span>{t.ok ? `${t.durationMs} ms` : 'Failed'}</span></div>)}</details>}</div>)}

@@ -7,7 +7,7 @@ async function fixture(page: Page, project: string) {
   const create = await page.request.post('/api/cases', { headers, data: { title: `Reply review ${project} ${Date.now()}`, person: 'Fictional Reviewer', equipment: 'Power wheelchair', reference: 'REPLY-TEST', category: 'Paperwork clarification', fictional: true } });
   expect(create.ok()).toBe(true); const repair: RepairCase = await create.json();
   const call = async <T,>(tool: string, args: object): Promise<T> => { const response = await page.request.post('/api/action', { headers, data: { tool, args } }); expect(response.ok(), await response.text()).toBe(true); return (await response.json()).data; };
-  const event = (stage: string, text: string) => call('record_repair_event', { caseId: repair.id, requestId: crypto.randomUUID(), party: stage === 'paperwork_sent' ? 'supplier' : 'insurer', source: 'Fictional source', channel: 'Email', occurredAt: new Date(Date.now() - 60000).toISOString(), text, stage });
+  const event = (stage: string, text: string, party = stage === 'paperwork_sent' ? 'supplier' : 'insurer') => call('record_repair_event', { caseId: repair.id, requestId: crypto.randomUUID(), party, source: 'Fictional source', channel: 'Email', occurredAt: new Date(Date.now() - 60000).toISOString(), text, stage });
   await event('paperwork_sent', 'We sent the estimate.'); await event('paperwork_requested', 'We cannot locate the estimate.'); await event('authorization_pending', 'Authorization is pending.');
   const contactResponse = await page.request.post('/api/contacts', { headers, data: { caseId: repair.id, name: 'Fictional Insurer', role: 'insurer', email: 'test@insurer.example', verified: false } }); expect(contactResponse.ok()).toBe(true);
   const contact = await contactResponse.json();
@@ -18,6 +18,65 @@ async function fixture(page: Page, project: string) {
   const cleanup = async () => { const response = await page.request.delete(`/api/cases/${repair.id}`, { headers, data: { confirm: repair.title } }); expect(response.ok()).toBe(true); };
   return { repair, brief, oldDraft, choose, open, event, cleanup };
 }
+
+test('supplier appointment review answers only the visit time with an exact quote and explicit confirmation', async ({ page }, info) => {
+  test.setTimeout(60000);
+  const f = await fixture(page, info.project.name);
+  try {
+    await f.event('appointment_scheduled', 'A visit was offered; its time needs confirmation.', 'supplier');
+    const date = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    const text = `Your repair appointment is confirmed for ${date} at 14:30 UTC+05:30.`;
+    await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible(); await f.choose();
+    const before = await f.brief(); await f.open();
+    await page.getByRole('combobox', { name: 'Reply from', exact: true }).selectOption('supplier');
+    await page.getByRole('textbox', { name: 'Source name', exact: true }).fill('Fictional Supplier');
+    await page.getByRole('textbox', { name: 'Reply text', exact: true }).fill(text);
+    await page.getByRole('button', { name: 'Preview changes', exact: true }).click();
+    const time = page.getByRole('checkbox', { name: 'Is the repair visit date and time confirmed?', exact: true });
+    const confirm = page.getByRole('checkbox', { name: 'I reviewed the source and selected answers.', exact: true });
+    await expect(time).not.toBeChecked(); await expect(page.locator('.reply-answer blockquote')).toHaveText(text);
+    await expect(page.locator('.reply-remaining')).toContainText('Are parts and accessibility arrangements ready for the visit?');
+    await expect(page.getByText('A confirmed appointment time does not confirm parts, accessibility arrangements or repair completion.', { exact: false })).toBeVisible();
+    expect(await f.brief()).toEqual(before);
+    await confirm.check(); await time.check(); await expect(confirm).not.toBeChecked();
+    await expect(page.getByRole('button', { name: 'Record reviewed reply', exact: true })).toBeDisabled();
+    await expect(page.getByRole('region', { name: 'Before and after preview' })).toContainText('3 open');
+    await confirm.check();
+    await page.setViewportSize({ width: info.project.name === 'mobile' ? 320 : 1440, height: 900 });
+    expect(await page.locator('dialog[open]').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    expect((await new AxeBuilder({ page }).include('dialog[open]').analyze()).violations).toEqual([]);
+    await page.screenshot({ path: `.data/screenshots/${info.project.name}-appointment-preview.png`, fullPage: true });
+    await page.getByRole('button', { name: 'Record reviewed reply', exact: true }).click(); await expect(page.getByRole('dialog')).not.toBeVisible();
+    const after = await f.brief(); const appointment = after.questions.find(q => q.kind === 'appointment')!;
+    expect(appointment.resolved).toBe(true); expect(appointment.answer).toContain(text);
+    expect(after.events.find(e => e.id === appointment.answerSourceId)?.text).toBe(text);
+    for (const kind of ['receipt', 'approval', 'visit_readiness']) expect(after.questions.find(q => q.kind === kind)?.resolved).toBe(false);
+    expect(after.events.some(e => e.stage === 'repair_completed')).toBe(false);
+    await page.reload(); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible(); await f.choose();
+    await expect(page.getByRole('region', { name: 'What changed', exact: true })).toContainText('Is the repair visit date and time confirmed?');
+  } finally { await f.cleanup(); }
+});
+
+test('appointment without a time zone remains evidence-only and requires review to save', async ({ page }, info) => {
+  const f = await fixture(page, info.project.name);
+  try {
+    await f.event('appointment_scheduled', 'A visit was offered; its time needs confirmation.', 'supplier');
+    await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible(); await f.choose(); await f.open();
+    await page.getByRole('combobox', { name: 'Reply from', exact: true }).selectOption('supplier');
+    await page.getByRole('textbox', { name: 'Source name', exact: true }).fill('Fictional Supplier');
+    const date = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    await page.getByRole('textbox', { name: 'Reply text', exact: true }).fill(`Your repair appointment is confirmed for ${date} at 14:30.`);
+    await page.getByRole('button', { name: 'Preview changes', exact: true }).click();
+    await expect(page.getByText('No supported answer proposed.', { exact: false })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Record reviewed reply', exact: true })).toBeDisabled();
+    expect((await f.brief()).events).toHaveLength(4);
+    await page.getByRole('checkbox', { name: 'I reviewed the source and selected answers.', exact: true }).check();
+    await page.getByRole('button', { name: 'Record reviewed reply', exact: true }).click(); await expect(page.getByRole('dialog')).not.toBeVisible();
+    const after = await f.brief(); expect(after.events).toHaveLength(5);
+    expect(after.questions.find(q => q.kind === 'appointment')?.resolved).toBe(false);
+    expect(after.questions.find(q => q.kind === 'visit_readiness')?.resolved).toBe(false);
+  } finally { await f.cleanup(); }
+});
 
 test('reviewed reply closes only selected receipt, persists changes and rebuilds stale request', async ({ page }, info) => {
   test.setTimeout(60000);
