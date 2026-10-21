@@ -13,11 +13,15 @@
 ![Zod](https://img.shields.io/badge/Zod-3E67B1?style=flat-square&logo=zod&logoColor=white)
 ![MCP Streamable HTTP](https://img.shields.io/badge/MCP-Streamable_HTTP-176B52?style=flat-square)
 
-**Wheelchair repair coordination, with evidence and user control.**
+**Wheelchair repair coordination.**
 
 MobilityRelay helps wheelchair users and caregivers turn scattered repair
 updates into a dated case history, clear next questions and reviewed follow-ups.
 It preserves what each party reported without deciding who is right.
+
+The name combines **Mobility**, reflecting wheelchair users and independence,
+with **Relay**, reflecting the exchange of updates between users, caregivers,
+suppliers and insurers. It describes coordination, not a repair service.
 
 Built for the **Alexa+ track** of the Amazon Developer Hackathon: an independent
 voice/text **Alexa+ experience simulator**, backed by a real self-hosted MCP
