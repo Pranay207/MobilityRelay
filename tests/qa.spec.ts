@@ -4,6 +4,39 @@ import { mkdir, writeFile } from 'node:fs/promises';
 
 const viewTab = (page: Page, name: string) => page.getByRole('tab', { name: name === 'Requests' ? /^Requests(?: \d+)?$/ : name, exact: true });
 
+test('compact assessment workspace keeps icon commands accessible and the empty conversation unclipped', async ({ page }, info) => {
+  test.setTimeout(120000);
+  for (const viewport of [{ width: 1248, height: 680 }, { width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport); await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+    if (viewport.width <= 760) await page.getByRole('button', { name: 'Open case navigation', exact: true }).click();
+    await expect(page.locator('.case-nav.selected')).toBeInViewport({ ratio: 1 });
+    await page.getByRole('button', { name: /Assessment arrangements Ravi/ }).click();
+    await expect(page.getByRole('heading', { name: 'Assessment arrangements', exact: true })).toBeVisible();
+    for (const name of ['Export history', 'Record update']) {
+      const command = page.locator('.heading-actions').getByRole('button', { name, exact: true });
+      await expect(command).toHaveAttribute('title', name);
+      expect(await command.innerText()).toBe('');
+      const bounds = (await command.boundingBox())!;
+      expect(bounds.width).toBe(44); expect(bounds.height).toBe(44);
+    }
+    if (viewport.width > 760) {
+      expect((await page.locator('.case-heading').boundingBox())!.height).toBeLessThanOrEqual(130);
+      expect((await page.locator('.case-metrics').boundingBox())!.height).toBeLessThanOrEqual(76);
+      await expect(page.locator('.case-nav.selected')).toBeInViewport({ ratio: 1 });
+    }
+    await expect(page.locator('.question-item.next-step p').first()).toHaveCSS('font-size', '16px');
+    await page.screenshot({ path: `.data/screenshots/${info.project.name}-compact-overview-${viewport.width}.png` });
+    if (viewport.width <= 1000) await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+    const log = page.getByRole('log', { name: 'Repair conversation', exact: true });
+    await expect(log.getByText('No messages yet', { exact: true })).toBeInViewport({ ratio: 1 });
+    expect(await log.evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
+    await expect(page.getByRole('textbox', { name: 'Message to Relay', exact: true })).toBeInViewport({ ratio: 1 });
+    expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()).violations).toEqual([]);
+    await page.screenshot({ path: `.data/screenshots/${info.project.name}-compact-empty-relay-${viewport.width}.png` });
+  }
+});
+
 test('next action and Relay input fit the first screen across desktop, tablet and mobile', async ({ page }, info) => {
   test.setTimeout(120000);
   for (const viewport of [{ width: 1248, height: 680 }, { width: 1440, height: 900 }, { width: 768, height: 900 }, { width: 390, height: 844 }, { width: 1366, height: 600 }]) {

@@ -109,8 +109,8 @@ environment variables, Windows installation guidance and optional integrations.
 
 ## Verification
 
-Latest working-tree verification: **October 21, 2026**, including the task-first
-layout and supplier appointment review. Tests used isolated fictional data on
+Latest working-tree verification: **October 21, 2026**, including the compact
+task-first layout and supplier appointment review. Tests used isolated fictional data on
 Windows / Node 24.11.0 / installed Edge. The earlier published implementation
 `40b4da8` also passed a clean GitHub checkout and empty-cache installation on
 October 20; that installation check does not cover the newer changes.
@@ -118,7 +118,7 @@ October 20; that installation check does not cover the newer changes.
 | Check | Result |
 | --- | --- |
 | Backend tests | All 174 passed, including appointment validation, reply review, rollback, provenance, stale-preview and real HTTP/MCP checks |
-| Desktop/mobile-emulation browser tests | All 68 passed in one 9.3-minute working-tree run; no retries or skips |
+| Desktop/mobile-emulation browser tests | Latest run: 69/70 passed; one desktop accessibility check timed out. A fresh rerun passed all four compact-layout/accessibility checks without relaxed assertions. The preceding task-first run passed 68/68. |
 | TypeScript and production build | Passed |
 | Automated accessibility | No detected violations in tested views, review dialogs and sign-in screens; keyboard-focus checks passed |
 | Actual local AI + MCP | October 19: seven-scenario Ollama-mode API workflow and real-model desktop review/mobile conversation checks passed; reply review itself uses trusted rules, not inference |

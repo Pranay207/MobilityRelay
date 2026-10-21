@@ -103,8 +103,8 @@ export function Assistant({ messages, busy, suspended = false, settings, onSend,
   };
   const submit = async (value: string) => { if (!value.trim() || busy || suspended) return; cancelVoice(); setListening(false); cancelSpeech(); const prior = text; setText(''); try { await onSend(value.trim(), cloud); } catch { setText(prior || value); } };
   return <aside ref={panel} className="assistant" aria-label="Simulated Alexa+ repair conversation"><div className="assistant-heading"><div className="relay-icon"><AudioLines size={22} /></div><div><h2>Relay</h2><span className="simulator-label">Alexa+ experience simulator</span><span>{agentLabel(settings)}</span></div><IconButton label={sound ? 'Mute spoken responses' : 'Enable spoken responses'} onClick={() => { if (sound && 'speechSynthesis' in window) speechSynthesis.cancel(); setSound(!sound); }}><span>{sound ? <Volume2 size={19} /> : <VolumeX size={19} />}</span></IconButton></div>
-    <div className="conversation" role="log" aria-label="Repair conversation" aria-live="polite">
-      {!messages.length && <div className="assistant-empty"><AudioLines size={28} /><h3>Your repair, one next step.</h3><p>Case record connected</p></div>}
+    <div className={`conversation ${!messages.length && !busy ? 'is-empty' : ''}`} role="log" aria-label="Repair conversation" aria-live="polite">
+      {!messages.length && !busy && <p className="assistant-empty">No messages yet</p>}
       {messages.map(message => <div key={message.id} className={`message message-${message.role}`}><span className="message-author">{message.role === 'assistant' ? 'Relay' : 'You'}</span><p>{message.text}</p>{message.traces.length > 0 && <details className="tool-trace"><summary><Terminal size={12} /> {message.traces.length} MCP {message.traces.length === 1 ? 'call' : 'calls'}</summary>{message.traces.map((t, i) => <div key={i}><span>{t.tool}</span><span>{t.ok ? `${t.durationMs} ms` : 'Failed'}</span></div>)}</details>}</div>)}
       {busy && <WaitingStatus />}<div ref={end} />
     </div>

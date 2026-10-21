@@ -146,8 +146,6 @@ h1, h2, h3, p { margin-top: 0; }
 .assistant-heading span { font-size: 12px; color: #8d998f; }
 .assistant-heading .simulator-label { display: block; font-size: 14px; line-height: 1.5; color: #586c60; margin-bottom: 3px; overflow-wrap: anywhere; }
 .conversation { overflow-y: auto; flex: 1; padding: 16px; min-height: 180px; }
-.assistant-empty { text-align: center; padding: 64px 12px 20px; color: #a2b4a9; }
-.assistant-empty h3 { font-size: 16px; color: #587460; font-weight: 500; margin: 17px 0 8px; }
 .assistant-empty p { font-size: 14px; color: #93a198; }
 .message { margin-bottom: 18px; padding: 12px 12px 10px; background: #f4f7f4; border-radius: 6px; overflow-wrap: anywhere; }
 .message.message-user { background: #fff; border-left: 2px solid #c3d7cb; padding-left: 10px; }
@@ -354,27 +352,36 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 }
 
 /* Keep the current task above supporting history without reducing readable type. */
-.sidebar { padding: 18px 12px 12px; overflow: hidden; }
+.sidebar { padding: 14px 10px 10px; overflow: hidden; }
 .sidebar > :not(nav) { flex-shrink: 0; }
 .sidebar nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; overscroll-behavior: contain; }
-.workspace-label { margin: 17px 9px 15px; }
-.case-search { margin-bottom: 8px; }
-.case-nav { padding: 9px 8px; }
-.case-nav small { margin-top: 3px; }
-.sidebar-bottom { margin-top: 0; padding-top: 10px; }
-.local-status { padding-top: 12px; margin-top: 4px; }
-.topbar { min-height: 52px; padding-block: 4px; }
-.case-heading { padding-block: 18px; gap: 16px; }
-.case-heading h1 { margin-bottom: 8px; font-size: 26px; }
-.eyebrow { margin-bottom: 7px; }
-.case-metrics { padding-block: 12px; gap: 16px; }
+.workspace-label { margin: 12px 8px 10px; }
+.nav-heading { margin-bottom: 2px; }
+.case-search { margin-bottom: 6px; }
+.sidebar nav { gap: 2px; }
+.case-nav { min-height: 44px; padding: 6px 7px; gap: 8px; }
+.case-nav strong { font-size: 14px; line-height: 1.35; }
+.case-nav small { margin-top: 2px; line-height: 1.35; }
+.case-avatar { width: 26px; height: 26px; flex-basis: 26px; }
+.new-case { min-height: 44px; padding-block: 10px; }
+.sidebar-bottom { margin-top: 0; padding-top: 8px; }
+.local-status { padding-top: 10px; margin-top: 4px; }
+.topbar { min-height: 48px; padding-block: 2px; }
+.case-heading { padding-block: 12px; gap: 14px; }
+.case-heading h1 { margin-bottom: 4px; font-size: 24px; }
+.eyebrow { margin-bottom: 4px; }
+.heading-actions > .compact-action { flex: 0 0 44px; min-width: 44px; width: 44px; padding: 0; }
+.case-metrics { padding-block: 8px; gap: 12px; }
 .case-metrics > div > span { margin-bottom: 3px; }
+.case-metrics strong { line-height: 1.4; }
 .content-layout { gap: 24px; }
 .content-layout.relay-drawer-layout { grid-template-columns: minmax(0, 1fr); }
-.tabs { min-height: 52px; margin-bottom: 16px; }
-.tabs button { padding-block: 14px 12px; }
+.tabs { min-height: 48px; margin-bottom: 14px; }
+.tabs button { padding-block: 12px 10px; }
 .questions > .section-title { margin-bottom: 10px; }
 .question-item.next-step { padding-top: 4px; }
+.question-item.next-step h2 { font-size: 20px; line-height: 1.4; margin-bottom: 8px; }
+.question-item p { line-height: 1.6; }
 .section-kicker { margin-bottom: 7px; }
 .question-actions > button.primary { background: var(--green); color: #fff; padding: 10px 14px; border: 1px solid var(--green); }
 .question-actions > .primary:hover:not(:disabled) { background: var(--green-dark); color: #fff; }
@@ -398,8 +405,8 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 .assistant-commands { padding: 8px 12px; gap: 6px; flex-wrap: nowrap; }
 .assistant-commands button { flex: 1; min-width: 0; justify-content: center; padding: 8px 4px; gap: 4px; font-size: 12px; }
 .conversation { min-height: 48px; }
-.assistant-empty { padding: 22px 10px; }
-.assistant-empty h3 { margin-top: 12px; }
+.conversation.is-empty { display: flex; align-items: center; justify-content: center; padding: 8px 12px; min-height: 40px; }
+.assistant-empty { margin: 0; padding: 0; color: var(--muted); font-size: 14px; line-height: 20px; text-align: center; }
 .composer textarea { height: 72px; min-height: 72px; max-height: 72px; resize: none; }
 .modal .assistant { height: min(620px, calc(100dvh - 112px)); max-height: calc(100dvh - 112px); }
 @media (max-width: 760px) {

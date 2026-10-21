@@ -63,8 +63,11 @@ supporting reports. Expand **Reported paperwork updates** or **Recent evidence**
 when needed; **Evidence** always retains the full history. The compact case
 header keeps the record readable without taking over the first screen. Relay
 fits the remaining desktop height, with its message input fixed inside the
-panel. On tablet/mobile or short windows, the labelled **Relay** button opens
-the conversation in a dialog. Chat scrolling stays inside the conversation.
+panel. Export and record-update commands use download/plus icons with accessible
+names and tooltips; review reply remains a labelled command. The sidebar keeps
+the selected case visible within its own list. On tablet/mobile or short windows,
+the labelled **Relay** button opens the conversation in a dialog. Chat scrolling
+stays inside the conversation; its empty state is simply **No messages yet**.
 
 ### Review a Reply: What Changed?
 
@@ -409,6 +412,28 @@ not establish the native toolkit's sub-500 ms query target.
 [Alexa+ quickstart](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-quickstart.html).
 
 ## 4. Testing and Latest Results
+
+### Compact Workspace Refinement: October 21
+
+The header now uses 44px export/update icon commands with accessible names and
+tooltips, a smaller title and tighter spacing. Sidebar rows are more compact;
+selecting a case scrolls only its navigation list as needed. Main question copy
+remains 16px. Relay's empty state no longer has a large illustration or clipped
+tagline: **No messages yet** fits inside the available conversation area.
+
+The production build and **174 backend tests passed**. The latest full browser
+run passed **69 of 70 checks**. One desktop accessibility check timed out while
+switching from Requests to Follow-ups; the runner also reported an internal
+fixture-step error. The cause is not established. A fresh run passed all **four
+desktop/mobile compact-layout and accessibility checks in 57.2 seconds**, without
+changing assertions or timeouts. This is not an uninterrupted 70/70 suite pass.
+
+The new sizing check covers the fictional assessment case at 1248x680, 1440x900
+and 390x844 CSS pixels. It verifies icon sizes/tooltips, selected-case visibility,
+desktop header/metric heights, readable body text, an unclipped empty log and a
+visible message input. Automated accessibility scans found no violations in
+these tested states. Desktop/mobile screenshots were inspected and the README
+image refreshed. These are automated checks, not independent-user validation.
 
 ### Task-First Workspace: October 21
 
