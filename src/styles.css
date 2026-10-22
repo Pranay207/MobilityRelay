@@ -385,6 +385,11 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 .section-kicker { margin-bottom: 7px; }
 .question-actions > button.primary { background: var(--green); color: #fff; padding: 10px 14px; border: 1px solid var(--green); }
 .question-actions > .primary:hover:not(:disabled) { background: var(--green-dark); color: #fff; }
+.empty-state > .primary { margin-top: 12px; }
+.contact-prerequisite { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px 0 12px 12px; margin-bottom: 16px; border-left: 3px solid var(--line); color: var(--muted); }
+.contact-prerequisite > span { flex: 1 1 150px; font-size: 14px; }
+.contact-prerequisite > svg { flex-shrink: 0; }
+.contact-prerequisite > button { font-size: 14px; }
 .reported-sources { margin: 16px 0; padding: 0; border-bottom: 0; }
 .reported-sources details, .evidence-disclosure { border-block: 1px solid var(--line); }
 .reported-sources summary, .evidence-disclosure > summary { display: flex; align-items: center; gap: 12px; min-height: 58px; cursor: pointer; list-style: none; }

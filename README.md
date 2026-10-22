@@ -77,6 +77,10 @@ app or a population estimate for all wheelchair users.
 5. **Review replies:** inspect quotations and a before/after preview, then explicitly select and confirm answers. Receipt can be answered while authorization remains pending; outdated drafts require a fresh request.
 6. **Follow up and export:** save local due items and download an attributed HTML/JSON history, with optional known-identity redaction. Exports identify stale drafts and use readable source numbers; HTML source links lead to the corresponding history entries.
 
+The selected case survives reload in the same browser tab. New cases show a
+**Record first update** action; a missing recipient contact has a direct
+**Add contact** action beside the blocked request workflow.
+
 English speech input and spoken replies are optional; text and forms remain
 available. Dictation shows live words, keeps listening across speech segments,
 and requires a separate send action. Manual editing cancels recording. Browser
@@ -166,7 +170,7 @@ Windows, Node 24.11.0 and installed Microsoft Edge.
 | --- | --- |
 | TypeScript and production build | Passed. |
 | Backend | **183 tests passed**, including real HTTP/MCP calls, grounded report reads, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
-| Browser workflows | **16 focused desktop/mobile checks passed**, including live dictation and speech recovery. The expanded 88-check run was stopped at the user's request to expedite after **58 passing checks** (all 44 desktop and 14 mobile); it is not a complete pass. The previous implementation passed 78/78. No assertions or timeouts were relaxed. |
+| Browser workflows | **32 targeted desktop/mobile checks passed** in 5.1 minutes: case restoration and safe fallback, first-update/contact setup, approval safeguards, persistence, case isolation, responsive layout and accessibility. The complete browser suite was not rerun for these UI changes; historical runs are recorded in the guide. No assertions or timeouts were relaxed. |
 | Accessibility and responsive layout | No automated violations in tested states. Keyboard focus, readable text, 44px header icon controls and desktop/mobile layout checks passed. |
 
 ```sh
@@ -181,8 +185,9 @@ case through reviewed follow-up, local capture and export; its timings are not
 human completion times or proof of repair-time savings. Automated checks do not
 establish full accessibility conformance or general model accuracy.
 
-Earlier local Ollama/MCP checks passed on October 19. The latest changes have
-not had a fresh clean-install or complete Docker-stack verification. Detailed
+A real Ollama/MCP fictional-case walkthrough completed on October 22, before
+these UI fixes. The latest changes have not had a fresh clean-install or
+complete Docker-stack verification. Detailed
 results, historical measurements and remaining work are in the
 [QA section of the project guide](docs/project-guide.md#4-testing-and-latest-results).
 

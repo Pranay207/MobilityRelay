@@ -39,6 +39,7 @@ test('a conversation-history failure leaves the loaded case visible and reports 
 
 test('compact assessment workspace keeps icon commands accessible and the empty conversation unclipped', async ({ page }, info) => {
   test.setTimeout(120000);
+  await page.addInitScript(() => sessionStorage.removeItem('mobilityrelay:selected-case'));
   for (const viewport of [{ width: 1248, height: 680 }, { width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(viewport); await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
@@ -302,10 +303,10 @@ test('long case fields and request review fit narrow and wide viewports', async 
     const event = await page.request.post('/api/action', { headers, data: { tool: 'record_repair_event', args: { caseId: repair.id, requestId: crypto.randomUUID(), party: 'supplier', source: 'FictionalSource'.repeat(10), channel: 'Email', occurredAt: new Date(Date.now() - 60000).toISOString(), stage: 'parts_delayed', text: 'LongUnbrokenSourceText'.repeat(60) } } }); expect(event.ok()).toBe(true);
     const brief = (await (await page.request.get(`/api/cases/${repair.id}`)).json()).data;
     const prepared = await page.request.post('/api/action', { headers, data: { tool: 'prepare_repair_request', args: { caseId: repair.id, requestId: crypto.randomUUID(), recipientId: contact.id, questionIds: brief.questions.map((question: { id: string }) => question.id) } } }); expect(prepared.ok()).toBe(true);
+    if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open case navigation', exact: true }).click();
+    await page.getByRole('button', { name: new RegExp(title) }).click(); await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
     for (const width of [320, 390, 768, 1440, 1920]) {
-      await page.setViewportSize({ width, height: 900 }); await page.reload(); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
-      if (width <= 760) await page.getByRole('button', { name: 'Open case navigation', exact: true }).click();
-      await page.getByRole('button', { name: new RegExp(title) }).click(); await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+      await page.setViewportSize({ width, height: 900 }); await page.reload(); await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
       for (const view of ['Overview', 'Evidence', 'Requests', 'Follow-ups', 'Contacts']) { await viewTab(page, view).click(); await checkWidth(page); }
       await viewTab(page, 'Requests').click(); await page.locator('.request-row').first().click();
       await expect(page.getByRole('dialog', { name: 'Review request', exact: true })).toBeVisible(); await checkWidth(page);

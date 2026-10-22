@@ -426,6 +426,45 @@ not establish the native toolkit's sub-500 ms query target.
 
 ## 4. Testing and Latest Results
 
+### Walkthrough UX Fixes: October 22
+
+Fixed the three issues found in the first-use walkthrough below:
+
+- The last successfully loaded case ID is remembered in `sessionStorage` for
+  that browser tab. Startup/sign-in checks it against the server-returned case
+  list before loading details. Unknown/deleted IDs fall back safely, empty
+  workspaces clear the preference, and logout or case deletion clears it.
+  Only an opaque ID is stored, not names, reports or credentials. Navigation
+  still works if browser storage is blocked, but restoration is unavailable.
+- Overview and Requests show **Recipient contact needed** and **Add contact**
+  when an open question has no recipient. The existing contact form opens
+  directly; saving returns to the same view and enables request preparation.
+  It does not prepare, approve, send or verify an address automatically.
+- An empty Overview uses a neutral document state and **Record first update**.
+  Empty Evidence offers the same action. Cases with evidence but no open
+  questions retain the existing incomplete-repair disclaimer.
+
+`npm run check` passed the production build and **183/183 backend tests**.
+The focused Edge run passed **32/32 checks in 5.1 minutes**, equally split
+between desktop and mobile. Twelve new checks cover restoration, tab isolation,
+unknown/deleted cases, an empty list, blocked storage, logout cleanup and the
+first-update/contact/draft path. Existing startup, reply review, full case,
+case-isolation, long-field and compact-layout regressions also passed.
+The new controls passed the tested 320px/1440px axe/layout checks; screenshots
+were inspected. Approval remains unchecked and capture disabled until review.
+
+An earlier focused attempt was stopped after the new walkthrough test waited
+on an incorrect label selector for the situation dropdown. It was corrected to
+the same accessible combobox selector used by existing tests. No application
+workaround, retry, skipped check or extended assertion timeout was needed;
+the final 32-check run completed cleanly. Existing Vite shutdown diagnostics
+still occur in backend security fixtures without failed assertions.
+
+The full browser suite, physical speech, independent usability, fresh install,
+complete Docker stack, real SMTP/AWS and native Alexa+ were not reverified by
+this focused UI change. The earlier walkthrough remains agent-authored evidence,
+not an independent human outcome study.
+
 ### First-Use UI Walkthrough with Ollama: October 22
 
 At implementation commit `260f282`, an agent walked through the running
@@ -470,8 +509,8 @@ relative API URL) are recorded separately from application failures.
 This is an agent-authored, implementation-informed walkthrough, not an
 independent participant test. It does not establish physical microphone or
 speaker behavior, accessibility conformance, human time saved, clinical
-benefit or shorter repairs. No functional code changed during this review;
-the three observed UI issues remain open.
+benefit or shorter repairs. No functional code changed during that review;
+the three observed UI issues were fixed afterward as recorded above.
 
 ### Grounded Conversation and Speech Recovery: October 22
 
@@ -1176,9 +1215,9 @@ percentages, cost savings, medical benefits or shorter repairs.
 
 Focus on completing evidence and submission, not adding unrelated features.
 
-- [ ] Restore the selected case on reload, with validation and a safe fallback (observed in the October 22 Ollama walkthrough).
-- [ ] Make the missing-contact prerequisite actionable from Overview instead of silently disabling request preparation.
-- [ ] Add a primary first-update action to the empty case Overview.
+- [x] Restore the selected case on reload, with validation and a safe fallback (October 22).
+- [x] Make the missing-contact prerequisite actionable from Overview and Requests instead of silently disabling request preparation.
+- [x] Add a primary first-update action to the empty case Overview and Evidence views.
 - [x] Label obsolete drafts clearly in exported case packs, not only in the workspace (October 22).
 - [x] Match exported numbered citations to linked, readable attributed-history source labels (October 22).
 - [x] Remove the verified chat-history startup dependency and parallelize settings/case-list loading; delayed/error-history and speech-history regressions pass. Earlier intermittent wait failures do not have a conclusively established root cause.

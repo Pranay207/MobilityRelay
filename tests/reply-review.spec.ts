@@ -53,7 +53,7 @@ test('supplier appointment review answers only the visit time with an exact quot
     expect(after.events.find(e => e.id === appointment.answerSourceId)?.text).toBe(text);
     for (const kind of ['receipt', 'approval', 'visit_readiness']) expect(after.questions.find(q => q.kind === kind)?.resolved).toBe(false);
     expect(after.events.some(e => e.stage === 'repair_completed')).toBe(false);
-    await page.reload(); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible(); await f.choose();
+    await page.reload(); await expect(page.getByRole('heading', { name: f.repair.title, exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'What changed', exact: true })).toContainText('Is the repair visit date and time confirmed?');
   } finally { await f.cleanup(); }
 });
@@ -102,7 +102,7 @@ test('reviewed reply closes only selected receipt, persists changes and rebuilds
     await page.getByRole('button', { name: 'Record reviewed reply', exact: true }).click(); await expect(page.getByRole('dialog')).not.toBeVisible();
     const after = await f.brief(); expect(after.events.length).toBe(before.events.length + 1); expect(after.questions.find(q => q.kind === 'receipt')?.resolved).toBe(true); expect(after.questions.find(q => q.kind === 'approval')?.resolved).toBe(false);
     await expect(page.getByRole('region', { name: 'What changed', exact: true })).toContainText('1 open');
-    await page.reload(); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible(); await f.choose();
+    await page.reload(); await expect(page.getByRole('heading', { name: f.repair.title, exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'What changed', exact: true })).toContainText('What is blocking authorization?');
     await page.screenshot({ path: `.data/screenshots/${info.project.name}-reply-review-saved.png`, fullPage: true });
     await page.getByRole('tab', { name: /^Requests/ }).click(); await page.getByRole('button', { name: /Old receipt request/ }).click();
