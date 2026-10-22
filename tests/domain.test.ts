@@ -158,6 +158,71 @@ test('HTML escapes imported markup, exports redact known identity', () => {
   const json = s.service.export({ caseId: s.c.id, format: 'json', redact: true }).content;
   for (const identity of ['Maya', 'Test Supplier', 'repairs@example.com', 'CASE-TEST']) assert.ok(!json.includes(identity)); s.store.close();
 });
+
+test('exports distinguish stale drafts without changing stored message status or content', () => {
+  const s = setup();
+  try {
+    s.event('parts_delayed'); const draft = s.draft();
+    const packet = () => JSON.parse(s.service.export({ caseId: s.c.id, format: 'json', redact: false }).content);
+    assert.equal(packet().messages[0].stale, false); assert.equal(packet().messages[0].displayStatus, 'draft');
+    s.event('other', 'A new update arrived.');
+    const before = s.store.brief(s.c.id); const message = packet().messages[0];
+    assert.equal(message.status, 'draft'); assert.equal(message.stale, true); assert.equal(message.displayStatus, 'Stale draft');
+    assert.equal(message.body, draft.body); assert.deepEqual(message.sourceIds, draft.sourceIds);
+    const html = s.service.export({ caseId: s.c.id, format: 'html', redact: false }).content;
+    assert.match(html, /Stale draft/); assert.match(html, /Historical request/); assert.match(html, /Prepare and review a fresh request before acting/);
+    assert.deepEqual(s.store.brief(s.c.id), before); assert.equal(s.deliveries(), 0);
+  } finally { s.store.close(); }
+});
+
+test('exported completed or uncertain message attempts never acquire a stale-draft label', () => {
+  const s = setup();
+  try {
+    s.event('parts_delayed'); const draft = s.draft(); s.event('other');
+    for (const status of ['sending', 'sent', 'captured', 'unknown', 'failed'] as const) {
+      s.store.put('draft', { ...draft, status });
+      const message = JSON.parse(s.service.export({ caseId: s.c.id, format: 'json', redact: false }).content).messages[0];
+      assert.equal(message.status, status); assert.equal(message.displayStatus, status); assert.equal(message.stale, false);
+      assert.ok(!s.service.export({ caseId: s.c.id, format: 'html', redact: false }).content.includes('Stale draft'));
+    }
+  } finally { s.store.close(); }
+});
+
+test('exports keep numbered sources stable across backdated updates and corrections while retaining record IDs', () => {
+  const s = setup();
+  try {
+    const original = s.event('parts_delayed', 'Original report.'); const old = s.draft();
+    const backdated = s.event('other', 'An older reported update.', { occurredAt: '2025-01-01T10:00:00Z' });
+    const correction = s.event('parts_delayed', 'Corrected report.', { supersedesId: original.id });
+    const current = s.draft(); const before = s.store.brief(s.c.id);
+    const data = JSON.parse(s.service.export({ caseId: s.c.id, format: 'json', redact: false }).content);
+    assert.deepEqual(data.events.map((e: { id: string; sourceLabel: string }) => [e.id, e.sourceLabel]), [[original.id, 'Source 1'], [backdated.id, 'Source 2'], [correction.id, 'Source 3']]);
+    assert.deepEqual(data.questions[0].sourceIds, [correction.id]); assert.deepEqual(data.questions[0].sourceLabels, ['Source 3']);
+    assert.deepEqual(data.messages[0].sourceLabels, ['Source 1']); assert.deepEqual(data.messages[1].sourceLabels, ['Source 3']);
+    assert.equal(data.messages[0].body, old.body); assert.equal(data.messages[1].body, current.body);
+    const html = s.service.export({ caseId: s.c.id, format: 'html', redact: false }).content;
+    for (const [index, event] of [original, backdated, correction].entries()) {
+      assert.ok(html.includes(`id="source-${event.id}"`)); assert.ok(html.includes(`Source ${index + 1} |`)); assert.ok(html.includes(`Record ID: ${event.id}`));
+    }
+    assert.ok(html.includes(`Corrects <a href="#source-${original.id}">Source 1</a>`));
+    assert.ok(html.includes(`href="#source-${correction.id}">Source 3</a>`));
+    assert.deepEqual(s.store.brief(s.c.id), before);
+  } finally { s.store.close(); }
+});
+
+test('export source links come from recorded provenance and never rewrite arbitrary message citations', () => {
+  const s = setup();
+  try {
+    s.event('parts_delayed');
+    const body = 'User wording [source 99]. <script>unsafe()</script>';
+    s.service.prepare({ caseId: s.c.id, requestId: randomUUID(), recipientId: s.contact.id, questionIds: s.store.brief(s.c.id).questions.map(q => q.id), body });
+    const data = JSON.parse(s.service.export({ caseId: s.c.id, format: 'json', redact: false }).content);
+    assert.equal(data.messages[0].body, body); assert.deepEqual(data.messages[0].sourceLabels, ['Source 1']);
+    const html = s.service.export({ caseId: s.c.id, format: 'html', redact: false }).content;
+    assert.ok(html.includes('[source 99]')); assert.ok(html.includes('&lt;script&gt;unsafe()&lt;/script&gt;')); assert.ok(!html.includes('<script>'));
+    assert.ok(!html.includes('>Source 99</a>'));
+  } finally { s.store.close(); }
+});
 test('deleting a case removes events, requests, approvals and chats', () => {
   const s = setup(); s.event('parts_delayed'); const d = s.draft(); s.service.issueApproval(s.c.id, d.id, d.hash); s.store.chat(s.c.id, 'user', 'Private text'); s.store.deleteCase(s.c.id);
   for (const table of ['records', 'requests', 'approvals']) assert.equal(s.store.db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get()!.n, 0); s.store.close();

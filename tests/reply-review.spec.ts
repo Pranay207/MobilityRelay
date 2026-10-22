@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { mkdir, readFile } from 'node:fs/promises';
 import type { Brief, Draft, RepairCase } from '../shared/types';
 
 async function fixture(page: Page, project: string) {
@@ -133,6 +134,37 @@ test('stale preview is rejected without an answer and can be re-reviewed', async
     await page.getByRole('checkbox', { name: 'I reviewed the source and selected answers.', exact: true }).check();
     await page.getByRole('button', { name: 'Record reviewed reply', exact: true }).click(); await expect(page.getByRole('dialog')).not.toBeVisible();
     expect((await f.brief()).questions.filter(q => !q.resolved)).toHaveLength(2);
+  } finally { await f.cleanup(); }
+});
+
+test('downloaded history labels stale requests and links readable source numbers at desktop and mobile widths', async ({ page }, info) => {
+  test.setTimeout(60000);
+  const f = await fixture(page, info.project.name);
+  try {
+    await f.event('other', 'A new fictional update makes the old request stale.');
+    await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible(); await f.choose();
+    await page.getByRole('button', { name: 'Export history', exact: true }).click();
+    const downloading = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download history', exact: true }).click();
+    const file = await (await downloading).path(); expect(file).not.toBeNull();
+    const exported = await page.context().newPage();
+    try {
+      await exported.setContent(await readFile(file!, 'utf8'));
+      const old = exported.locator('article').filter({ hasText: 'Old receipt request' });
+      await expect(old).toContainText('Stale draft'); await expect(old).toContainText('Historical request.');
+      await expect(old).toContainText('OLD DRAFT BODY asking about receipt.');
+      expect(await exported.locator('a[href^="#source-"]').evaluateAll(links => links.every(link => document.getElementById((link as HTMLAnchorElement).hash.slice(1))))).toBe(true);
+      await old.getByRole('link', { name: 'Source 1', exact: true }).click();
+      await expect(exported.locator(`[id="source-${f.oldDraft.sourceIds[0]}"]`)).toBeInViewport();
+      await expect(exported.locator(`[id="source-${f.oldDraft.sourceIds[0]}"] > strong`)).toContainText('Source 1 |');
+      await mkdir('.data/screenshots', { recursive: true });
+      for (const width of [1100, 320]) {
+        await exported.setViewportSize({ width, height: 900 }); await old.scrollIntoViewIfNeeded();
+        expect(await exported.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        expect((await new AxeBuilder({ page: exported }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()).violations).toEqual([]);
+        await exported.screenshot({ path: `.data/screenshots/${info.project.name}-export-source-links-${width}.png` });
+      }
+    } finally { await exported.close(); }
   } finally { await f.cleanup(); }
 });
 

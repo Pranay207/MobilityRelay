@@ -4,6 +4,39 @@ import { mkdir, writeFile } from 'node:fs/promises';
 
 const viewTab = (page: Page, name: string) => page.getByRole('tab', { name: name === 'Requests' ? /^Requests(?: \d+)?$/ : name, exact: true });
 
+test('startup fetches settings and cases together and displays the case before slow conversation history', async ({ page }) => {
+  let settingsHeld = false; let casesRequested = false; let historyHeld = false;
+  let releaseSettings!: () => void; let releaseHistory!: () => void;
+  const settingsGate = new Promise<void>(resolve => { releaseSettings = resolve; });
+  const historyGate = new Promise<void>(resolve => { releaseHistory = resolve; });
+  await page.route('**/api/settings', async route => { settingsHeld = true; await settingsGate; await route.continue(); });
+  await page.route('**/api/cases', async route => { casesRequested = true; await route.continue(); });
+  await page.route('**/api/cases/*/chat', async route => { historyHeld = true; await historyGate; await route.continue(); });
+  try {
+    await page.goto('/');
+    await expect.poll(() => settingsHeld).toBe(true);
+    await expect.poll(() => casesRequested).toBe(true);
+    releaseSettings();
+    await expect.poll(() => historyHeld).toBe(true);
+    await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Record update', exact: true }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+    const historyLoaded = page.waitForResponse(response => /\/api\/cases\/[^/]+\/chat$/.test(new URL(response.url()).pathname));
+    releaseHistory(); await historyLoaded;
+    await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  } finally { releaseSettings(); releaseHistory(); }
+});
+
+test('a conversation-history failure leaves the loaded case visible and reports the error', async ({ page }) => {
+  await page.route('**/api/cases/*/chat', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Conversation history unavailable.' }) }));
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('Conversation history unavailable.');
+  await page.getByRole('button', { name: 'Record update', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+});
+
 test('compact assessment workspace keeps icon commands accessible and the empty conversation unclipped', async ({ page }, info) => {
   test.setTimeout(120000);
   for (const viewport of [{ width: 1248, height: 680 }, { width: 1440, height: 900 }, { width: 390, height: 844 }]) {

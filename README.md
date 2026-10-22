@@ -75,7 +75,7 @@ app or a population estimate for all wheelchair users.
 3. **Prepare:** create a source-backed request without sending it.
 4. **Approve:** review the exact recipient and message before authorizing an attempt. The default mode captures messages locally, not by email.
 5. **Review replies:** inspect quotations and a before/after preview, then explicitly select and confirm answers. Receipt can be answered while authorization remains pending; outdated drafts require a fresh request.
-6. **Follow up and export:** save local due items and download an attributed HTML/JSON history, with optional known-identity redaction.
+6. **Follow up and export:** save local due items and download an attributed HTML/JSON history, with optional known-identity redaction. Exports identify stale drafts and use readable source numbers; HTML source links lead to the corresponding history entries.
 
 English speech input and spoken replies are optional; text and forms remain
 available. Reply recognition is deliberately narrow: supported insurer receipt
@@ -155,8 +155,8 @@ Windows, Node 24.11.0 and installed Microsoft Edge.
 | Check | Recorded result |
 | --- | --- |
 | TypeScript and production build | Passed. |
-| Backend | **174 tests passed**, including real HTTP/MCP calls, provenance, approval, reply review and stale-state protection. |
-| Browser workflows | **69/70 passed** in the latest full run; one desktop test exceeded its initial case-heading wait before reaching reply review. A fresh run passed all **four** stale-preview/full-case checks without relaxed assertions or timeouts. |
+| Backend | **178 tests passed**, including real HTTP/MCP calls, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
+| Browser workflows | **78/78 passed** in one 7.2-minute desktop/mobile run, including delayed startup, silent historical messages, stale previews, complete case workflows and exported source links. No retries, skips or relaxed assertions/timeouts. |
 | Accessibility and responsive layout | No automated violations in tested states. Keyboard focus, readable text, 44px header icon controls and desktop/mobile layout checks passed. |
 
 ```sh

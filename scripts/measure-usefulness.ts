@@ -146,6 +146,10 @@ try {
   await expect(history.locator('body')).toContainText(reply);
   await expect(history.locator('body')).toContainText('captured');
   await expect(history.locator('body')).toContainText('Check authorization response');
+  await expect(history.locator('article:has(.stale)')).toHaveCount(1);
+  await expect(history.locator('article:has(.stale)')).toContainText('Stale draft');
+  await expect(history.locator(`[id="source-${sources[0].id}"] > strong`)).toContainText('Source 1 |');
+  assert.equal(await history.locator('a[href^="#source-"]').evaluateAll(links => links.every(link => document.getElementById((link as HTMLAnchorElement).hash.slice(1)))), true);
   await history.screenshot({ path: resolve(directory, '7-exported-history.png'), fullPage: true });
   const brief = app.store.brief(repair.id);
   assert.equal(brief.events.length, 5); assert.equal(brief.drafts.length, 2);
@@ -165,11 +169,10 @@ try {
       'The source-backed follow-up is called a request in the Requests view; the separately named Follow-ups view stores due items, not messages.',
       'After the reply changes the case, the user must open the old request, choose Prepare fresh draft, then review and approve the new message.',
       'Receipt and authorization are separate review outcomes. Recording the reply does not automatically select its proposed answer.',
-      'The exported old request is labelled draft, without the Stale draft label visible in the workspace. This is an author-observed clarity risk, not reported user confusion.',
-      'Exported message citations use source numbers while attributed-history entries display UUIDs. Human cross-reference clarity remains untested.',
+      'Exported stale drafts and numbered source links are checked, but independent handover comprehension remains untested.',
     ],
     outcome: { eventCount: brief.events.length, receiptAnswered: true, authorizationOpen: true, draftCount: brief.drafts.length, locallyCapturedMessages: 1, scheduledLocalDueItems: 1, deliveredEmails: 0, repairCompleted: false },
-    export: { filename: 'repair-history.html', bytes: Buffer.byteLength(exported), sha256: createHash('sha256').update(exported).digest('hex'), knownIdentityChecksPassed: true, fullAnonymizationClaimed: false },
+    export: { filename: 'repair-history.html', bytes: Buffer.byteLength(exported), sha256: createHash('sha256').update(exported).digest('hex'), knownIdentityChecksPassed: true, staleDraftLabelChecked: true, sourceLinksChecked: true, fullAnonymizationClaimed: false },
     toolCounts: Object.fromEntries([...new Set(traces.map(t => t.tool))].map(tool => [tool, traces.filter(t => t.tool === tool).length])),
     limitations: 'One scripted run; no manual baseline, independent human, wheelchair-user validation, reading time, physical voice check, real email delivery or evidence of shorter repairs. Timing is not a human usability result, production benchmark or quantified benefit.',
   });

@@ -17,6 +17,7 @@ export default function App() {
   const [cases, setCases] = useState<RepairCase[]>([]); const [selected, setSelected] = useState(''); const selectedRef = useRef('');
   const refreshGeneration = useRef(0);
   const [brief, setBrief] = useState<Brief | null>(null); const [messages, setMessages] = useState<ChatMessage[]>([]); const [settings, setSettings] = useState<Settings | null>(null);
+  const [conversationReady, setConversationReady] = useState(false);
   const [tab, setTab] = useState<Tab>('Overview'); const [dialog, setDialog] = useState<Dialog | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [search, setSearch] = useState(''); const [sidebar, setSidebar] = useState(false); const [highlight, setHighlight] = useState(''); const [traces, setTraces] = useState<ToolTrace[]>([]);
   const caseNavigation = useRef<HTMLElement>(null);
@@ -42,16 +43,17 @@ export default function App() {
       if (!id || !list.some(c => c.id === id)) { setSelected(list.find(c => c.reference === 'DEMO-1042')?.id ?? list[0]?.id ?? ''); if (!list.length) { setBrief(null); setMessages([]); } return; }
       const result = await api<{ data: Brief; traces: ToolTrace[] }>(`/api/cases/${id}`);
       if (!current()) return;
+      setBrief(result.data); addTraces(result.traces);
       const chat = await api<ChatMessage[]>(`/api/cases/${id}/chat`);
-      if (current()) { setBrief(result.data); addTraces(result.traces); setMessages(chat); }
-    } catch (err) { if (current()) throw err; }
+      if (current()) { setMessages(chat); setConversationReady(true); }
+    } catch (err) { if (current()) { setConversationReady(true); throw err; } }
   };
   useEffect(() => { void api<{ authenticated: boolean; csrf?: string }>('/api/session').then(async result => {
     if (result.csrf) setCsrf(result.csrf); setAuthenticated(result.authenticated);
-    if (result.authenticated) { setSettings(await api('/api/settings')); await loadCases().then(list => setSelected(list.find(c => c.reference === 'DEMO-1042')?.id ?? list[0]?.id ?? '')); }
+    if (result.authenticated) { const [settings, list] = await Promise.all([api<Settings>('/api/settings'), loadCases()]); setSettings(settings); setSelected(list.find(c => c.reference === 'DEMO-1042')?.id ?? list[0]?.id ?? ''); }
     setReady(true);
   }).catch(err => { setError(err.message); setReady(true); }); }, []);
-  useEffect(() => { if (!selected || !authenticated) return; setBrief(null); setMessages([]); setHighlight(''); void refresh(selected).catch(err => setError(err.message)); }, [selected, authenticated]);
+  useEffect(() => { if (!selected || !authenticated) return; setBrief(null); setMessages([]); setConversationReady(false); setHighlight(''); void refresh(selected).catch(err => setError(err.message)); }, [selected, authenticated]);
   useEffect(() => { if (!authenticated) return; const timer = setInterval(() => { if (!busy) void refresh().catch(() => {}); }, 20000); return () => clearInterval(timer); }, [authenticated, busy]);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 6000); return () => clearTimeout(timer); }, [notice]);
   useEffect(() => {
@@ -88,6 +90,9 @@ export default function App() {
   const reviewedReply = brief?.events.findLast(e => e.review && !brief.events.some(other => other.supersedesId === e.id));
   const sourceLabels = new Map((brief?.events ?? []).map((event, index) => [event.id, `Source ${index + 1}`]));
   const close = () => { if (!busy) setDialog(null); };
+  const relay = conversationReady
+    ? <Assistant key={selected} messages={messages} busy={busy} suspended={!!dialog || sidebar} settings={settings} onSend={sendChat} onError={setError} />
+    : <aside className="assistant" aria-label="Simulated Alexa+ repair conversation"><div className="assistant-heading"><div className="relay-icon"><AudioLines size={22} /></div><div><h2>Relay</h2><span className="simulator-label">Alexa+ experience simulator</span></div></div><div className="conversation is-empty" role="status">Loading conversation...</div></aside>;
 
   if (!ready) return <div className="startup"><LoaderCircle className="spin" size={28} /><p>Opening MobilityRelay...</p></div>;
   if (!authenticated) return <main className="login"><Brand /><h1>Sign in to your workspace</h1>{error && <p role="alert" className="error">{error}</p>}<form onSubmit={e => { e.preventDefault(); void run(async () => { const result = await post<{ csrf: string }>('/api/login', { password }); setCsrf(result.csrf); setAuthenticated(true); setSettings(await api('/api/settings')); await loadCases().then(list => setSelected(list[0]?.id ?? '')); }); }}><label>Workspace password<input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required /></label><button className="primary" disabled={busy}>Sign in</button></form></main>;
@@ -121,7 +126,7 @@ export default function App() {
           {tab === 'Follow-ups' && <section className="view-section"><div className="section-title"><h2>Follow-ups</h2><button className="text-button" onClick={() => setDialog({ type: 'followup' })} disabled={busy}><Plus size={15} /> Schedule</button></div>{!brief.followups.length && <div className="empty-state"><CalendarClock size={28} /><h3>No follow-ups scheduled</h3></div>}{brief.followups.slice().sort((a, b) => a.dueAt.localeCompare(b.dueAt)).map(f => <article className={`followup-row ${f.status === 'scheduled' && Date.parse(f.dueAt) < Date.now() ? 'overdue' : ''}`} key={f.id}><CalendarClock size={21} /><div><strong>{f.title}</strong><small>{time(f.dueAt, f.timezone)} / {f.timezone}</small><span className="followup-state">{f.status === 'scheduled' && Date.parse(f.dueAt) < Date.now() ? 'Due now' : f.status}</span></div>{f.status === 'scheduled' && <><IconButton label={`Complete ${f.title}`} disabled={busy} onClick={() => void run(async () => { await call('manage_repair_followup', { caseId: selected, requestId: crypto.randomUUID(), action: 'complete', followupId: f.id, timezone: f.timezone }); })}><Check size={17} /></IconButton><IconButton label={`Reschedule ${f.title}`} disabled={busy} onClick={() => setDialog({ type: 'followup', followup: f })}><CalendarClock size={17} /></IconButton><IconButton label={`Cancel ${f.title}`} disabled={busy} onClick={() => void run(async () => { await call('manage_repair_followup', { caseId: selected, requestId: crypto.randomUUID(), action: 'cancel', followupId: f.id, timezone: f.timezone }); })}><X size={17} /></IconButton></>}</article>)}</section>}
           {tab === 'Contacts' && <section className="view-section"><div className="section-title"><h2>Case contacts</h2><button className="text-button" onClick={() => setDialog({ type: 'contact' })} disabled={busy}><Plus size={15} /> Add contact</button></div>{!brief.contacts.length && <div className="empty-state"><Users size={28} /><h3>No contacts added</h3></div>}{brief.contacts.map(c => <button className="contact-row" key={c.id} onClick={() => setDialog({ type: 'contact', contact: c })}><span className="contact-avatar"><Users size={20} /></span><span><strong>{c.name}</strong><small>{c.email}</small></span><span className="contact-role">{c.role}<small>{c.verified ? 'User-confirmed address' : 'Unconfirmed address'}</small></span><ChevronRight size={17} /></button>)}</section>}
           <footer className="case-footer"><span>Updated {time(brief.repairCase.updatedAt)}</span><button className="text-button destructive" onClick={() => setDialog({ type: 'delete' })} disabled={busy}><Trash2 size={13} /> Delete case</button></footer>
-        </main>{!mobile && <Assistant key={selected} messages={messages} busy={busy} suspended={!!dialog || sidebar} settings={settings} onSend={sendChat} onError={setError} />}</div>
+        </main>{!mobile && relay}</div>
       </>}
     </div>
     {dialog?.type === 'case' && <Modal title="New repair case" onClose={close}><CaseForm busy={busy} onSubmit={data => void run(async () => { const c = await post<RepairCase>('/api/cases', data); await loadCases(); setSelected(c.id); setSidebar(false); setDialog(null); })} /></Modal>}
@@ -135,7 +140,7 @@ export default function App() {
     {brief && dialog?.type === 'export' && <Modal title="Export case history" onClose={close}><ExportForm busy={busy} onSubmit={(format, redact) => void run(async () => { const packet = await call<{ content: string; mime: string; filename: string }>('export_repair_packet', { caseId: selected, format, redact }); download(packet); setDialog(null); setNotice('Case history downloaded. Review before sharing.'); })} /></Modal>}
     {brief && dialog?.type === 'delete' && <Modal title="Delete this case" onClose={close}><DeleteForm title={brief.repairCase.title} busy={busy} onSubmit={confirm => void run(async () => { await api(`/api/cases/${selected}`, { method: 'DELETE', body: JSON.stringify({ confirm }) }); setDialog(null); setSelected(''); setNotice('Case and its stored records deleted.'); })} /></Modal>}
     {dialog?.type === 'settings' && <Modal title="Workspace settings" onClose={close} wide><div className="settings-content"><dl><div><dt>Assistant</dt><dd>{agentLabel(settings)}</dd></div><div><dt>Email</dt><dd>{settings?.mailMode === 'smtp' ? 'SMTP configured' : 'Local capture - not delivered'}</dd></div><div><dt>Transport</dt><dd>Streamable HTTP / {settings?.protocol}</dd></div><div><dt>Access</dt><dd>{settings?.protected ? 'Shared password workspace' : 'Localhost only / no password'}</dd></div></dl><h3>Recent MCP calls</h3><Traces traces={traces} />{settings?.protected && <button className="secondary" disabled={busy} onClick={() => void run(async () => { await post('/api/logout', {}); setCsrf(''); setAuthenticated(false); setDialog(null); setBrief(null); setSelected(''); })}>Sign out</button>}</div></Modal>}
-    {mobile && brief && relayOpen && <Modal title="Relay conversation" onClose={() => setRelayOpen(false)}><Assistant key={selected} messages={messages} busy={busy} settings={settings} onSend={sendChat} onError={setError} /></Modal>}
+    {mobile && brief && relayOpen && <Modal title="Relay conversation" onClose={() => setRelayOpen(false)}>{relay}</Modal>}
   </div></FeedbackContext.Provider>;
 }
 

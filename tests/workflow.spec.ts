@@ -36,6 +36,32 @@ async function mockVoiceLifecycle(page: Page) {
   });
 }
 
+test('slow initial history cannot be mistaken for a new spoken reply', async ({ page }, info) => {
+  await mockVoiceLifecycle(page);
+  let release!: () => void; let initial = true;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/cases/*/chat', async route => {
+    if (!initial) { await route.continue(); return; }
+    initial = false;
+    const caseId = new URL(route.request().url()).pathname.split('/')[3];
+    await gate;
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify([{ id: 'fictional-historical-reply', caseId, role: 'assistant', text: 'Historical reply must stay silent.', createdAt: '2026-01-01T10:00:00Z', traces: [] }]) });
+  });
+  try {
+    await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+    if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Loading conversation...' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Enable spoken responses', exact: true })).toHaveCount(0);
+    release();
+    await expect(page.getByRole('log')).toContainText('Historical reply must stay silent.');
+    await page.getByRole('button', { name: 'Enable spoken responses', exact: true }).click();
+    expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken)).toEqual([]);
+    await page.getByRole('button', { name: 'Case brief', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken.length)).toBe(1);
+    expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken[0])).not.toContain('Historical reply must stay silent.');
+  } finally { release(); }
+});
+
 test('voice callbacks from an interrupted request cannot change a new recording', async ({ page }, info) => {
   await mockVoiceLifecycle(page);
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();

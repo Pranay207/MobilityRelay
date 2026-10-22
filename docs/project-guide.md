@@ -69,6 +69,18 @@ the selected case visible within its own list. On tablet/mobile or short windows
 the labelled **Relay** button opens the conversation in a dialog. Chat scrolling
 stays inside the conversation; its empty state is simply **No messages yet**.
 
+The case workspace appears without waiting for chat history. Settings and the
+case list load together; Relay shows **Loading conversation...** until history
+is ready. Its speech controls initialize with that history so it is not treated
+as a new spoken response. History errors leave the loaded case visible.
+
+Exported histories label obsolete unsent requests **Stale draft**, retain their
+original wording and explain that fresh review is needed. HTML links use the
+same numbered sources as the workspace and lead to attributed-history entries;
+corrections link to their original source. Record IDs remain available for
+provenance. JSON keeps the original message `status` and adds `stale`,
+`displayStatus` and readable `sourceLabels`; export does not change stored data.
+
 ### Review a Reply: What Changed?
 
 Use **Review reply**, or say/type **"The insurer replied: We received the
@@ -412,6 +424,45 @@ not establish the native toolkit's sub-500 ms query target.
 [Alexa+ quickstart](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-quickstart.html).
 
 ## 4. Testing and Latest Results
+
+### Export and Startup Fixes: October 22
+
+The production build and **178 backend tests passed** using `npm run check`.
+Four new backend tests cover stale/fresh drafts, unchanged attempt statuses,
+stable source numbering after backdated updates/corrections, exact message
+preservation, escaping and read-only export behavior. Two earlier parallel-file
+runs each failed a different existing two-second MCP fixture. Running the same
+assertions with sequential test files passed; `npm test` now makes this scheduling
+explicit. MCP deadlines, no-replay assertions and deliberate overlapping-request
+tests remain unchanged. Host contention is a suspected contributor, not a proven
+cause of every earlier wait failure. Vite shutdown diagnostics still occur in
+the isolated security fixtures without failed assertions in the final run.
+
+The final complete Edge run passed **78/78 browser checks in 7.2 minutes**, with
+no retries or skips. New tests cover simultaneous settings/case-list loading,
+a usable case while chat history is held back, history-fetch errors, silent
+historical replies with opt-in speech for new replies, and downloaded HTML
+source links/stale labels at 1100px and 320px. Both desktop and mobile projects
+passed, along with the existing approval, case-isolation, correction, source,
+follow-up, speech-callback and accessibility checks. Screenshots of the exported
+document were inspected. An exploratory 76-check run was stopped before the
+final history guard; it had wait failures and is not counted as a passing run.
+Its local failure artifacts remain under
+`.data/verification/export-startup-2026-10-22/interrupted-browser-run/`.
+
+The updated scripted fictional case completed with zero page errors or failed
+requests and successful traces for all six MCP tools. It verifies the actual
+downloaded stale-draft label and that source links resolve, as well as known-
+identity redaction, local capture, a persistent due item and authorization left
+open. Evidence:
+`.data/verification/usefulness-export-startup-fixed-2026-10-22/summary.json`.
+Its 8.940 wall seconds / 7.105 summed step seconds are automation timings, not
+human completion times or evidence of time saved. No email was delivered.
+
+These changes remove a verified startup dependency; the root cause of every
+earlier intermittent initial-load delay is not established. Physical speech,
+independent usability, live email/AWS, native Alexa+ and production-load behavior
+remain unverified. No new deployment or fresh-install verification is claimed.
 
 ### Application Review: October 22
 
@@ -1025,9 +1076,9 @@ percentages, cost savings, medical benefits or shorter repairs.
 
 Focus on completing evidence and submission, not adding unrelated features.
 
-- [ ] Label obsolete drafts clearly in exported case packs, not only in the workspace.
-- [ ] Make exported numbered citations directly match readable attributed-history source labels.
-- [ ] Investigate intermittent initial case-loading delays; the October 22 fresh rerun passed, but did not establish a cause or fix.
+- [x] Label obsolete drafts clearly in exported case packs, not only in the workspace (October 22).
+- [x] Match exported numbered citations to linked, readable attributed-history source labels (October 22).
+- [x] Remove the verified chat-history startup dependency and parallelize settings/case-list loading; delayed/error-history and speech-history regressions pass. Earlier intermittent wait failures do not have a conclusively established root cause.
 - [ ] Verify physical microphone, audible replies and keyboard/screen-reader usability.
 - [x] Remove model waits for supported case reads and redacted HTML history exports; October 19 working-tree verification is recorded above.
 - [ ] Review broader model behavior and slow complex requests; the spot checks do not establish general accuracy or fast inference.
