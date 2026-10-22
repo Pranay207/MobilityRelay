@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 import { startServer } from '../server/app.js';
 import type { Config } from '../server/config.js';
-import type { AgentReply, Brief, Draft } from '../shared/types.js';
+import type { AgentReply, Brief, ChatMessage, Draft } from '../shared/types.js';
 
 const config: Config = { host: '127.0.0.1', port: 0, dataDir: '.data/test', password: '', mcpToken: 'test-token-'.repeat(8), publicOrigin: '', production: false, seed: true, agentMode: 'local', modelId: '', region: 'us-east-1', ollamaBaseUrl: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b' };
 test('real HTTP MCP and browser-host workflows enforce permissions end to end', async () => {
@@ -70,6 +70,11 @@ for (const mode of ['local', 'bedrock', 'ollama'] as const) test(`${mode} HTTP c
     if (mode === 'bedrock') for (const text of ['Why is that?', 'Show my case status and remind me tomorrow', 'Export my case history as JSON', 'Prepare a request to the supplier']) {
       const response = await ask(text); assert.equal(response.status, 403); assert.match((await response.json()).error, /Consent/);
     }
+    const reports = await ask('Compare the supplier and insurer reports'); assert.equal(reports.status, 200);
+    const comparison = await reports.json() as AgentReply;
+    assert.ok(comparison.spokenText); assert.ok(comparison.spokenText.length < comparison.reply.length);
+    const history = await (await fetch(`${running.url}/api/cases/${repair.id}/chat`, { headers })).json() as ChatMessage[];
+    assert.equal(history.at(-1)?.text, comparison.reply); assert.equal(history.at(-1)?.spokenText, comparison.spokenText);
     assert.deepEqual(running.store.brief(repair.id), before);
   } finally { await running.close(); }
 });

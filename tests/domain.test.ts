@@ -47,6 +47,50 @@ test('corrections preserve originals and cannot cross case boundaries', () => {
 });
 test('preparing a request never delivers it and keeps readable source references', () => { const s = setup(); s.event('parts_delayed'); const d = s.draft(); assert.equal(d.status, 'draft'); assert.equal(s.deliveries(), 0); assert.match(d.body, /\[source 1\]/); assert.ok(d.sourceIds.length); assert.ok(d.sourceIds.every(id => !d.body.includes(id))); s.store.close(); });
 
+test('each question kind produces recipient-facing wording without workspace instructions', () => {
+  const scenarios: [Stage, string, string][] = [
+    ['paperwork_sent', 'receipt', 'Please provide the submission date, recipient and receipt reference'],
+    ['paperwork_requested', 'paperwork', 'Please name the exact document'],
+    ['authorization_pending', 'approval', 'What remains under review, what information is missing'],
+    ['authorization_approved', 'order', 'Please provide the order reference'],
+    ['coverage_refused', 'coverage', 'Please provide the written reason'],
+    ['parts_delayed', 'parts', 'Please provide the part reference'],
+    ['technician_unavailable', 'technician', 'When is a professional available'],
+    ['assessment_needed', 'assessment', 'Who can arrange a professional assessment'],
+    ['appointment_scheduled', 'appointment', 'Please confirm the exact visit date, time and time zone'],
+    ['appointment_scheduled', 'visit_readiness', 'Please confirm whether the required parts and accessibility arrangements are ready'],
+    ['provider_silent', 'response', 'Who is the named contact'],
+    ['loaner_needed', 'loaner', 'Is temporary equipment available'],
+  ];
+  for (const [stage, kind, expected] of scenarios) {
+    const s = setup();
+    try {
+      s.event(stage, 'Exact supplier wording: Ask what was received.');
+      if (kind === 'receipt') s.event('paperwork_requested', 'The estimate is missing.', { party: 'insurer' });
+      const question = s.store.brief(s.c.id).questions.find(q => q.kind === kind)!;
+      const draft = s.service.prepare({ caseId: s.c.id, requestId: randomUUID(), recipientId: s.contact.id, questionIds: [question.id] });
+      const request = draft.body.split('\n\nPlease clarify:\n')[1];
+      assert.ok(request.includes(expected), kind); assert.ok(request.includes(question.title));
+      assert.doesNotMatch(request, /Ask what|Do not attempt|does not establish|Pending does not identify/);
+      assert.ok(draft.body.includes('Exact supplier wording: Ask what was received.'), 'Quoted reports must remain verbatim.');
+      assert.equal(draft.status, 'draft'); assert.equal(s.deliveries(), 0);
+    } finally { s.store.close(); }
+  }
+});
+
+test('draft wording changes never rewrite a reviewed body or reuse its approval', () => {
+  const s = setup();
+  try {
+    s.event('authorization_pending'); const original = s.draft();
+    const body = 'My edited wording. Ask what remains under review. [source 1]';
+    const edited = s.service.prepare({ caseId: s.c.id, requestId: randomUUID(), recipientId: s.contact.id, questionIds: original.questionIds, subject: 'Reviewed subject', body });
+    assert.equal(edited.body, body); assert.notEqual(edited.hash, original.hash);
+    assert.equal(s.store.get<Draft>('draft', original.id, s.c.id).body, original.body);
+    assert.throws(() => s.service.issueApproval(s.c.id, edited.id, original.hash), /does not match/);
+    assert.equal(s.deliveries(), 0);
+  } finally { s.store.close(); }
+});
+
 test('corrected sources replace current question citations without erasing history', () => {
   const s = setup(); const old = s.event('parts_delayed', 'Old unconfirmed date');
   const correction = s.event('parts_delayed', 'Corrected availability report', { supersedesId: old.id });

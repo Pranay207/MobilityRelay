@@ -80,6 +80,9 @@ app or a population estimate for all wheelchair users.
 The selected case survives reload in the same browser tab. New cases show a
 **Record first update** action; a missing recipient contact has a direct
 **Add contact** action beside the blocked request workflow.
+New drafts ask the recipient direct questions rather than copying workspace
+instructions. Reviewed answers use readable source numbers linked to Evidence;
+technical record IDs remain available under **Record details**.
 
 English speech input and spoken replies are optional; text and forms remain
 available. Dictation shows live words, keeps listening across speech segments,
@@ -87,7 +90,10 @@ and requires a separate send action. Manual editing cancels recording. Browser
 speech-service and microphone accuracy still need physical verification.
 Relay can read the latest supplier or insurer report, or compare
 both with dated source numbers. Corrected records are excluded and long reports
-are labelled as excerpts. Unsupported local questions receive an explicit
+are labelled as excerpts. Optional report playback gives the source, date and
+user-recorded situation with an uncertainty warning, rather than reading the
+long quotations aloud. Written quotations remain in the conversation and full
+reports in Evidence. Unsupported local questions receive an explicit
 limitation instead of an unrelated summary. Reply recognition is deliberately narrow: supported insurer receipt
 statements and supplier appointment confirmations with an explicit date, time
 and UTC offset. Ambiguous wording remains evidence only. No connected inbox or
@@ -169,8 +175,8 @@ Windows, Node 24.11.0 and installed Microsoft Edge.
 | Check | Recorded result |
 | --- | --- |
 | TypeScript and production build | Passed. |
-| Backend | **183 tests passed**, including real HTTP/MCP calls, grounded report reads, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
-| Browser workflows | **32 targeted desktop/mobile checks passed** in 5.1 minutes: case restoration and safe fallback, first-update/contact setup, approval safeguards, persistence, case isolation, responsive layout and accessibility. The complete browser suite was not rerun for these UI changes; historical runs are recorded in the guide. No assertions or timeouts were relaxed. |
+| Backend | **188 tests passed**, including real HTTP/MCP calls, recipient-facing wording, separate spoken report text, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
+| Browser workflows | **100 regression checks passed** in the full run; **both new playback checks passed** after isolating their fictional test case. Coverage includes source navigation, request wording, speech lifecycle, approval, persistence, case isolation, responsive layout and accessibility. The initial test-fixture failure and separate rerun are recorded in the guide; this was not a single clean 102-check run. |
 | Accessibility and responsive layout | No automated violations in tested states. Keyboard focus, readable text, 44px header icon controls and desktop/mobile layout checks passed. |
 
 ```sh

@@ -3,6 +3,22 @@ import type { Contact, Draft, Followup, Question, RepairEvent } from '../shared/
 import { Store, AppError, hash, now } from './store.js';
 import { toolSchemas, type ToolName } from './schemas.js';
 import { previewReply } from './replies.js';
+import { displayAnswer } from '../shared/presentation.js';
+
+const requestDetails: Record<string, string> = {
+  receipt: 'Please provide the submission date, recipient and receipt reference, or confirm what is needed to locate the submission.',
+  paperwork: 'Please name the exact document, who needs to provide it and where it should be sent.',
+  approval: 'What remains under review, what information is missing, and when can I expect the next update?',
+  order: 'Please provide the order reference and expected arrival date, or confirm what is needed before an order can be placed.',
+  coverage: 'Please provide the written reason and the available review process.',
+  parts: 'Please provide the part reference, current availability and expected arrival date, if known.',
+  technician: 'When is a professional available, what alternative arrangements are possible, and who is coordinating them?',
+  assessment: 'Who can arrange a professional assessment of the reported problem, and when can it take place?',
+  appointment: 'Please confirm the exact visit date, time and time zone.',
+  visit_readiness: 'Please confirm whether the required parts and accessibility arrangements are ready, and identify anything still outstanding.',
+  response: 'Who is the named contact for this request, and when can I expect a response?',
+  loaner: 'Is temporary equipment available, who can assess its suitability, and what costs or funding requirements apply?',
+};
 
 export interface MailDelivery { mode: 'capture' | 'smtp'; send: (draft: Draft) => Promise<string> }
 export class RepairService {
@@ -56,7 +72,7 @@ export class RepairService {
       const sourceNumbers = new Map(this.store.list<RepairEvent>('event', input.caseId).map((event, index) => [event.id, index + 1]));
       const subject = input.subject ?? `Repair ${c.reference || c.title}: clarification requested`;
       if (/[\r\n]/.test(subject)) throw new AppError('The subject must be a single line.');
-      const body = input.body ?? `Hello ${contact.name},\n\nI am following up on ${c.equipment}, reference ${c.reference || 'not provided'}.\n\nMy record contains these reported updates:\n${sources.map(e => `- ${e.occurredAt.slice(0, 10)} | ${e.source}: "${e.text}" [source ${sourceNumbers.get(e.id)}]`).join('\n')}\n\nPlease clarify:\n${questions.map((q, i) => `${i + 1}. ${q.title} ${q.explanation}`).join('\n')}\n\nPlease include a named contact and the date of the next update. These are attributed reports; I am seeking clarification, not assigning fault.\n\nThank you,\n${c.person}`;
+      const body = input.body ?? `Hello ${contact.name},\n\nI am following up on ${c.equipment}, reference ${c.reference || 'not provided'}.\n\nMy record contains these reported updates:\n${sources.map(e => `- ${e.occurredAt.slice(0, 10)} | ${e.source}: "${e.text}" [source ${sourceNumbers.get(e.id)}]`).join('\n')}\n\nPlease clarify:\n${questions.map((q, i) => `${i + 1}. ${q.title}${requestDetails[q.kind] ? ` ${requestDetails[q.kind]}` : ''}`).join('\n')}\n\nPlease include a named contact and the date of the next update. These are attributed reports; I am seeking clarification, not assigning fault.\n\nThank you,\n${c.person}`;
       const value: Draft = { id: randomUUID(), caseId: c.id, caseVersion: c.version, recipientId: contact.id, recipient: contact.email, subject, body, sourceIds, questionIds: questions.map(q => q.id), hash: hash(JSON.stringify({ recipient: contact.email, subject, body, sourceIds, version: c.version })), status: 'draft', createdAt: now(), deliveryId: null };
       this.store.put('draft', value); return value;
     });
@@ -130,7 +146,7 @@ export class RepairService {
       note: 'User-maintained attributed reports. Not independently verified. Review for personal information before sharing. No medical or legal advice.',
       repairCase: { title: redact(brief.repairCase.title), person: redact(brief.repairCase.person), equipment: redact(brief.repairCase.equipment), reference: redact(brief.repairCase.reference) },
       events: brief.events.map(e => ({ ...e, sourceLabel: sourceLabels.get(e.id)!, source: redact(e.source), text: redact(e.text), reference: redact(e.reference) })),
-      questions: brief.questions.map(q => ({ ...q, sourceLabels: labels(q.sourceIds), answer: redact(q.answer) })),
+      questions: brief.questions.map(q => ({ ...q, sourceLabels: labels(q.sourceIds), answer: redact(q.answer), displayAnswer: redact(displayAnswer(q, q.answerSourceId ? sourceLabels.get(q.answerSourceId) : undefined)) })),
       followups: brief.followups.map(f => ({ ...f, title: redact(f.title) })),
       messages: brief.drafts.map(d => {
         const stale = d.status === 'draft' && d.caseVersion !== brief.repairCase.version;
@@ -144,8 +160,8 @@ export class RepairService {
     const content = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MobilityRelay case history</title>
 <style>body{font:16px/1.6 system-ui;max-width:850px;margin:40px auto;padding:24px;color:#203029;overflow-wrap:anywhere}h1,h2{line-height:1.2}article{border-top:1px solid #ccc;padding:20px 0;break-inside:avoid}blockquote{margin:12px 0;white-space:pre-wrap}small{color:#52665b}li{margin:12px 0}a{color:#16644e}.stale{border-left:3px solid #916011;padding-left:12px}article:target{background:#f6f8f7}@media(max-width:600px){body{margin:16px auto;padding:16px}}@media print{body{margin:0}button{display:none}}</style></head><body>
 <h1>MobilityRelay case history</h1><p>${esc(data.repairCase.title)} | ${esc(data.repairCase.equipment)} | ${esc(data.repairCase.reference)}</p><p>${data.fictional ? 'FICTIONAL DEMONSTRATION CASE. ' : ''}${esc(data.note)}</p><small>Exported ${esc(data.generatedAt)}. ${input.redact ? 'Identity redaction enabled.' : 'Identity redaction disabled.'}</small>
-<h2>Open questions and answers</h2><ul>${data.questions.map(q => `<li><strong>${esc(q.title)}</strong> - ${q.resolved ? `Answered: ${esc(q.answer)}` : 'Unresolved'}<br><small>Sources: ${sourceLinks(q.sourceIds)}</small></li>`).join('')}</ul>
-<h2>Attributed history</h2>${data.events.map(e => `<article id="source-${esc(e.id)}"><strong>${esc(e.sourceLabel)} | ${esc(e.occurredAt.slice(0, 10))} | ${esc(e.source)}</strong><br><small>${esc(e.party)} / ${esc(e.channel)}${e.supersedesId ? ` / Corrects ${sourceLink(e.supersedesId)}` : ''}</small><blockquote>${esc(e.text)}</blockquote><small>Record ID: ${esc(e.id)}</small></article>`).join('')}
+<h2>Open questions and answers</h2><ul>${data.questions.map(q => `<li><strong>${esc(q.title)}</strong> - ${q.resolved ? `Answered: ${esc(q.displayAnswer)}` : 'Unresolved'}<br><small>Sources: ${sourceLinks(q.sourceIds)}</small></li>`).join('')}</ul>
+<h2>Attributed history</h2>${data.events.map(e => `<article id="source-${esc(e.id)}"><strong>${esc(e.sourceLabel)} | ${esc(e.occurredAt.slice(0, 10))} | ${esc(e.source)}</strong><br><small>${esc(e.party)} / ${esc(e.channel)}${e.supersedesId ? ` / Corrects ${sourceLink(e.supersedesId)}` : ''}</small><blockquote>${esc(e.text)}</blockquote><details><summary>Record details</summary><small>Record ID: ${esc(e.id)}</small></details></article>`).join('')}
 <h2>Message history</h2>${data.messages.map(m => `<article><strong>${esc(m.subject)} | ${esc(m.displayStatus)}</strong>${m.stale ? '<p class="stale">Historical request. The case changed after this draft was prepared. Prepare and review a fresh request before acting.</p>' : ''}<p>${esc(m.recipient)}</p><blockquote>${esc(m.body)}</blockquote><small>Sources: ${sourceLinks(m.sourceIds)}</small></article>`).join('')}
 <h2>Follow-ups</h2><ul>${data.followups.map(f => `<li>${esc(f.title)} | ${esc(f.dueAt)} | ${esc(f.status)}</li>`).join('')}</ul></body></html>`;
     return { filename: 'repair-history.html', mime: 'text/html', content };

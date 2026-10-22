@@ -87,7 +87,7 @@ export function Assistant({ messages, busy, suspended = false, settings, onSend,
     if (sound && !suspended && !listening && !document.hidden && last.role === 'assistant' && canSpeak) {
       stopSpeech();
       try {
-        const utterance = new SpeechSynthesisUtterance(last.text); utterance.lang = 'en-IN'; speaking.current = utterance;
+        const utterance = new SpeechSynthesisUtterance(last.spokenText ?? last.text); utterance.lang = 'en-IN'; speaking.current = utterance;
         utterance.onend = () => { if (speaking.current === utterance) speaking.current = null; };
         utterance.onerror = event => {
           if (speaking.current !== utterance) return;

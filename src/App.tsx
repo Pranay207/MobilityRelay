@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AudioLines, CalendarClock, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Download, FileText, FolderOpen, Inbox, LoaderCircle, Mail, MailOpen, Menu, Plus, Search, Settings2, ShieldCheck, Trash2, Users, X } from 'lucide-react';
 import type { AgentReply, Brief, ChatMessage, Contact, Draft, Followup, Question, RepairCase, RepairEvent, Settings, ToolTrace, UpdateProposal } from '../shared/types';
 import { stageLabels } from '../shared/types';
+import { displayAnswer } from '../shared/presentation';
 import { api, action, download, post, setCsrf } from './api';
 import { Assistant, Brand, IconButton, Modal, Traces, FeedbackContext, agentLabel } from './components';
 import { AnswerForm, CaseForm, ContactForm, EventForm, ExportForm, FollowupForm, PrepareForm, RequestForm, DeleteForm } from './forms';
@@ -127,7 +128,7 @@ export default function App() {
             </section>
             {reviewedReply && <ReplyChangesPanel event={reviewedReply} onSource={() => showSource(reviewedReply.id)} canPrepare={!busy && open.length > 0 && brief.contacts.length > 0} onPrepare={() => setDialog({ type: 'prepare', questionId: open[0]?.id })} />}
             <ReportedSources brief={brief} onSource={showSource} />
-            {answered.length > 0 && <section className="answered"><h2>Answered questions</h2>{answered.map(q => <article key={q.id}><CheckCircle2 size={17} /><div><strong>{q.title}</strong><p>{q.answer}</p></div></article>)}</section>}
+            {answered.length > 0 && <section className="answered"><h2>Answered questions</h2>{answered.map(q => <article key={q.id}><CheckCircle2 size={17} /><div><strong>{q.title}</strong><p>{displayAnswer(q, q.answerSourceId ? sourceLabels.get(q.answerSourceId) : undefined)}</p>{q.answerSourceId && sourceLabels.has(q.answerSourceId) && <div className="source-links"><button onClick={() => showSource(q.answerSourceId!)}><FileText size={14} /> {sourceLabels.get(q.answerSourceId)}</button></div>}</div></article>)}</section>}
             <details className="evidence-disclosure"><summary><h2>Recent evidence</h2><span>{brief.events.length} updates</span><ChevronDown size={17} /></summary>{brief.events.slice(-2).reverse().map(e => <Evidence key={e.id} label={sourceLabels.get(e.id) ?? 'Source unavailable'} event={e} highlight={false} corrected={brief.events.some(other => other.supersedesId === e.id)} onCorrect={() => setDialog({ type: 'event', event: e })} busy={busy} />)}</details>
           </>}
           {tab === 'Evidence' && <section className="view-section"><div className="section-title"><h2>Evidence history</h2><span>{brief.events.length} sources</span></div>{!brief.events.length && <div className="empty-state"><FileText size={28} /><h3>No evidence recorded</h3>{firstUpdate}</div>}{brief.events.slice().sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).map(e => <Evidence key={e.id} label={sourceLabels.get(e.id) ?? 'Source unavailable'} event={e} highlight={highlight === e.id} corrected={brief.events.some(other => other.supersedesId === e.id)} onCorrect={() => setDialog({ type: 'event', event: e })} busy={busy} />)}</section>}

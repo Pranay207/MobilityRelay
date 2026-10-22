@@ -55,6 +55,16 @@ test('supplier appointment review answers only the visit time with an exact quot
     expect(after.events.some(e => e.stage === 'repair_completed')).toBe(false);
     await page.reload(); await expect(page.getByRole('heading', { name: f.repair.title, exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'What changed', exact: true })).toContainText('Is the repair visit date and time confirmed?');
+    const answered = page.locator('.answered');
+    await expect(answered).toContainText('User-reviewed reply. Source 5.');
+    await expect(answered).not.toContainText(appointment.answerSourceId!);
+    await page.screenshot({ path: `.data/screenshots/${info.project.name}-readable-answer-source.png`, fullPage: true });
+    await answered.getByRole('button', { name: 'Source 5', exact: true }).click();
+    const source = page.locator(`#event-${appointment.answerSourceId}`);
+    await expect(source).toBeVisible(); await expect(source).toContainText(text);
+    await expect(source.getByText(appointment.answerSourceId!, { exact: false })).not.toBeVisible();
+    await source.getByText('Record details', { exact: true }).click();
+    await expect(source).toContainText(appointment.answerSourceId!);
   } finally { await f.cleanup(); }
 });
 
@@ -113,6 +123,10 @@ test('reviewed reply closes only selected receipt, persists changes and rebuilds
     await page.getByRole('button', { name: 'Prepare draft', exact: true }).click();
     await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(/Authorization is still pending\./);
     const body = await page.getByRole('textbox', { name: 'Message', exact: true }).inputValue(); expect(body).not.toContain('OLD DRAFT BODY'); expect(body).not.toContain('Was the paperwork received?');
+    expect(body).toContain('What remains under review, what information is missing, and when can I expect the next update?');
+    expect(body).not.toContain('Ask what remains under review'); expect(body).not.toContain('Pending does not identify the responsible party');
+    await expect(page.getByRole('checkbox', { name: 'I approve this recipient and exact message.', exact: true })).not.toBeChecked();
+    await page.screenshot({ path: `.data/screenshots/${info.project.name}-recipient-facing-request.png`, fullPage: true });
     expect((await f.brief()).drafts.every(d => d.status === 'draft')).toBe(true);
     expect(errors).toEqual([]);
   } finally { await f.cleanup(); }

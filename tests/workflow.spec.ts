@@ -81,6 +81,45 @@ test('specific report questions show dated sources and unsupported questions sta
   await page.screenshot({ path: `.data/screenshots/${info.project.name}-grounded-conversation.png`, fullPage: true });
 });
 
+test('report playback uses short attributed situations while written quotations and MCP history remain', async ({ page }, info) => {
+  await mockVoiceLifecycle(page);
+  const session = await (await page.request.get('/api/session')).json(); const headers = { 'x-relay-csrf': session.csrf };
+  const created = await page.request.post('/api/cases', { headers, data: { title: `Fictional playback ${info.project.name}`, person: 'Fictional Speaker', equipment: 'Power chair', reference: 'VOICE-TEST', category: 'Paperwork', fictional: true } });
+  expect(created.ok()).toBe(true); const repair = await created.json();
+  try {
+    for (const event of [
+      { party: 'supplier', stage: 'authorization_pending', text: 'The repair is waiting for authorization. We do not have a receipt reference to share yet.' },
+      { party: 'insurer', stage: 'paperwork_requested', text: 'We cannot locate the repair estimate. Please provide the submission reference and recipient.' },
+    ]) {
+      const recorded = await page.request.post('/api/action', { headers, data: { tool: 'record_repair_event', args: { ...event, caseId: repair.id, requestId: crypto.randomUUID(), source: `Fictional ${event.party}`, channel: 'Email', occurredAt: new Date(Date.now() - 60000).toISOString() } } });
+      expect(recorded.ok()).toBe(true);
+    }
+    await page.addInitScript(id => sessionStorage.setItem('mobilityrelay:selected-case', id), repair.id);
+    await page.goto('/'); await expect(page.getByRole('heading', { name: repair.title, exact: true })).toBeVisible();
+    if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+    await page.getByRole('button', { name: 'Enable spoken responses', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Message to Relay' }).fill('Compare the supplier and insurer reports');
+    const response = page.waitForResponse(response => response.url().endsWith('/api/agent') && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Send message', exact: true }).click();
+    const result = await (await response).json();
+    const answer = page.getByRole('log').locator('.message-assistant').last();
+    await expect(answer.locator('p')).toHaveText(result.reply);
+    await expect(answer).toContainText('Latest supplier report, Source 1'); await expect(answer).toContainText('Latest insurer report, Source 2');
+    await expect(answer.locator('.tool-trace')).toContainText('1 MCP call');
+    await expect.poll(() => page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken.length)).toBe(1);
+    expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken[0])).toBe(result.spokenText);
+    expect(result.spokenText.length).toBeLessThan(result.reply.length);
+    for (const text of ['Source 1', 'Source 2', 'Reported situation: Authorization pending', 'Reported situation: Paperwork requested', 'not independently verified']) expect(result.spokenText).toContain(text);
+    expect(result.spokenText).not.toContain('We do not have a receipt reference');
+    await page.reload(); await expect(page.getByRole('heading', { name: repair.title, exact: true })).toBeVisible();
+    if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+    await expect(page.getByRole('log').locator('.message-assistant').last().locator('p')).toHaveText(result.reply);
+    expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken)).toEqual([]);
+  } finally {
+    const removed = await page.request.delete(`/api/cases/${repair.id}`, { headers, data: { confirm: repair.title } }); expect(removed.ok()).toBe(true);
+  }
+});
+
 test('speech service errors preserve typed text and never submit or write evidence', async ({ page }, info) => {
   await mockSpeech(page, { error: 'network' });
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();

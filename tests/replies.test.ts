@@ -48,6 +48,24 @@ test('appointment preview quotes only a supplier-confirmed time and keeps readin
   } finally { s.store.close(); }
 });
 
+test('reviewed answer exports use a readable source without changing stored answer evidence', () => {
+  const s = setup();
+  try {
+    const preview = s.preview(); const saved = s.service.record(s.commit(preview));
+    const before = database(s.store); const question = s.store.brief(s.repair.id).questions.find(q => q.kind === 'receipt')!;
+    assert.ok(question.answer.includes(saved.id));
+    const data = JSON.parse(s.service.export({ caseId: s.repair.id, format: 'json', redact: false }).content);
+    const exported = data.questions.find((q: Question) => q.kind === 'receipt');
+    assert.equal(exported.answer, question.answer); assert.match(exported.displayAnswer, /User-reviewed reply\. Source 4\./);
+    assert.equal(exported.displayAnswer.includes(saved.id), false); assert.ok(exported.displayAnswer.includes(preview.answers[0].quote));
+    const html = s.service.export({ caseId: s.repair.id, format: 'html', redact: false }).content;
+    assert.match(html, /User-reviewed reply\. Source 4\./); assert.equal(html.includes(`Source: ${saved.id}.`), false);
+    assert.ok(html.includes(`<a href="#source-${saved.id}">Source 4</a>`));
+    assert.ok(html.includes(`<details><summary>Record details</summary><small>Record ID: ${saved.id}</small></details>`));
+    assert.equal(database(s.store), before);
+  } finally { s.store.close(); }
+});
+
 for (const zone of ['+00:00', '-04:00', '+05:30', '+14:00', '-14:00']) test(`appointment supports an explicit UTC offset ${zone}`, () => {
   const s = appointmentSetup();
   try { assert.equal(s.preview({ text: s.text.replace('+05:30', zone) }).answers.length, 1); }

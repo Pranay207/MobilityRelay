@@ -1,6 +1,7 @@
 import { BedrockRuntimeClient, ConverseCommand, type ConverseCommandInput, type ConverseCommandOutput, type Message, type ToolConfiguration, type ToolInputSchema } from '@aws-sdk/client-bedrock-runtime';
 import { randomUUID } from 'node:crypto';
 import type { AgentReply, Brief, ChatMessage, Draft, ToolTrace } from '../shared/types.js';
+import { stageLabels } from '../shared/types.js';
 import type { Config } from './config.js';
 import type { ToolCaller } from './mcp.js';
 import { mcpCatalog } from './mcp.js';
@@ -17,7 +18,7 @@ export async function respond(input: { caseId: string; text: string; allowCloud:
   const brief = await call<Brief>('get_repair_brief', { caseId: input.caseId }, traces);
   const intent = localIntent(input.text);
   const report = reportCommand(input.text);
-  if (report) return { reply: reportedReply(brief, report), traces };
+  if (report) return { ...reportedReply(brief, report), traces };
   if (intent === 'read' && /\b(?:have|did)\s+you\b/i.test(input.text) && /\b(?:sent|send|emailed|delivered)\b/i.test(input.text)) {
     const labels: Record<Draft['status'], string> = { draft: 'awaiting approval', captured: 'captured locally, not delivered', sent: 'SMTP accepted, receipt unconfirmed', sending: 'delivery in progress', unknown: 'delivery outcome unknown', failed: 'failed' };
     const statuses = Object.entries(labels).flatMap(([status, label]) => { const count = brief.drafts.filter(draft => draft.status === status).length; return count ? [`${count} ${label}`] : []; });
@@ -81,13 +82,19 @@ function reportedReply(brief: Brief, target: 'supplier' | 'insurer' | 'both') {
   const reports = parties.map(party => {
     const latest = brief.events.filter(event => event.party === party && !superseded.has(event.id)).reverse()
       .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || Date.parse(b.recordedAt) - Date.parse(a.recordedAt))[0];
-    if (!latest) return `No current ${party} report is recorded in this case.`;
+    if (!latest) return { written: `No current ${party} report is recorded in this case.`, spoken: `No current ${party} report is recorded in this case.` };
     const source = brief.events.findIndex(event => event.id === latest.id) + 1;
     const date = new Date(latest.occurredAt).toISOString().slice(0, 10);
     const excerpt = latest.text.length > 280 ? `${latest.text.slice(0, 280)}... [excerpt]` : latest.text;
-    return `Latest ${party} report, Source ${source}, ${date} (UTC), ${latest.source}, ${latest.channel}: "${excerpt}"`;
+    return {
+      written: `Latest ${party} report, Source ${source}, ${date} (UTC), ${latest.source}, ${latest.channel}: "${excerpt}"`,
+      spoken: `Latest ${party} report, Source ${source}, ${date} UTC. Reported situation: ${stageLabels[latest.stage]}.`,
+    };
   });
-  return `${reports.join('\n')} These are attributed reports, not independently verified facts. ${target === 'both' ? 'Different reports do not establish who is at fault. ' : ''}Read the full records in Evidence.`;
+  return {
+    reply: `${reports.map(report => report.written).join('\n')} These are attributed reports, not independently verified facts. ${target === 'both' ? 'Different reports do not establish who is at fault. ' : ''}Read the full records in Evidence.`,
+    spokenText: `${reports.map(report => report.spoken).join(' ')} Reported, not independently verified. ${target === 'both' ? 'These reports do not establish fault. ' : ''}Read the quotations in the conversation or Evidence.`,
+  };
 }
 
 function caseReadReply(brief: Brief, text: string) {
