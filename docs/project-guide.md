@@ -426,6 +426,53 @@ not establish the native toolkit's sub-500 ms query target.
 
 ## 4. Testing and Latest Results
 
+### First-Use UI Walkthrough with Ollama: October 22
+
+At implementation commit `260f282`, an agent walked through the running
+Ollama app on port 4318 using visible UI controls rather than replaying only
+the prepared demo. A new fictional case (`UX-20261022`) was created with two
+contacts and conflicting supplier/insurer reports. Real `qwen2.5:1.5b` inference
+selected a supplier request through MCP; that single browser request took
+28.488 seconds. This is an observed wait, not a general performance benchmark
+or a human task-completion measurement.
+
+The task completed: inspect the source comparison, review the unapproved
+draft, review an insurer receipt reply, explicitly answer receipt, replace the
+stale draft, approve a fresh authorization request for local capture, schedule
+a follow-up, reload and export the history. Final read-only checks confirmed
+four events, two requests, one captured message and one scheduled local due
+item. Receipt was answered; authorization remained open. No email was
+delivered and no repair was marked complete. Unapproved/stale capture controls
+were blocked, and the proposed reply answer started unchecked.
+
+The downloaded HTML removed the checked known identity fields, labelled the
+stale draft and linked numbered sources to their history entries. The case and
+persisted conversation were also inspected at a 390x844 mobile viewport with
+no horizontal page overflow. Desktop/mobile screenshots were visually checked.
+No uncaught page errors or HTTP API error responses were observed.
+
+| Priority | Observed first-use issue | Needed improvement |
+| --- | --- | --- |
+| Medium | Reload opened Maya's `DEMO-1042` instead of the selected new case. The records and follow-up were still present when the new case was selected again. | Restore a valid previously selected case, with safe fallback when it is unavailable. |
+| Medium | With no contacts, Overview disabled **Prepare a request** without explaining the prerequisite or offering an add-contact action. | Give an actionable contact-setup path beside the blocked task. |
+| Low | The new case showed a success-style **No open questions recorded** state; its first-update action was only the header icon. | Show a primary first-update action in the empty Overview. |
+
+Draft wording also includes internal question-explanation phrasing such as
+"Ask what remains under review"; the quoted sources are correct, but a human
+should still edit the outbound wording for the recipient.
+
+Local evidence is in
+`.data/verification/agent-user-walkthrough-2026-10-22/summary.json`, alongside
+screenshots and the actual downloaded HTML. Automation adjustments (modal
+selector scoping, an attempted disabled click and correcting the harness's
+relative API URL) are recorded separately from application failures.
+
+This is an agent-authored, implementation-informed walkthrough, not an
+independent participant test. It does not establish physical microphone or
+speaker behavior, accessibility conformance, human time saved, clinical
+benefit or shorter repairs. No functional code changed during this review;
+the three observed UI issues remain open.
+
 ### Grounded Conversation and Speech Recovery: October 22
 
 Added bounded, read-only answers for `What did the supplier say?`,
@@ -1129,6 +1176,9 @@ percentages, cost savings, medical benefits or shorter repairs.
 
 Focus on completing evidence and submission, not adding unrelated features.
 
+- [ ] Restore the selected case on reload, with validation and a safe fallback (observed in the October 22 Ollama walkthrough).
+- [ ] Make the missing-contact prerequisite actionable from Overview instead of silently disabling request preparation.
+- [ ] Add a primary first-update action to the empty case Overview.
 - [x] Label obsolete drafts clearly in exported case packs, not only in the workspace (October 22).
 - [x] Match exported numbered citations to linked, readable attributed-history source labels (October 22).
 - [x] Remove the verified chat-history startup dependency and parallelize settings/case-list loading; delayed/error-history and speech-history regressions pass. Earlier intermittent wait failures do not have a conclusively established root cause.
