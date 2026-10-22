@@ -71,6 +71,49 @@ test('compact assessment workspace keeps icon commands accessible and the empty 
   }
 });
 
+test('compact spacing prioritizes conversation space without shrinking reading text or action targets', async ({ page }, info) => {
+  test.setTimeout(120000);
+  const measurements = [];
+  for (const viewport of [{ width: 1248, height: 680 }, { width: 1440, height: 1000 }, { width: 1920, height: 1080 }, { width: 390, height: 844 }, { width: 320, height: 700 }, { width: 1366, height: 600 }]) {
+    await page.setViewportSize(viewport); await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+    const prepare = page.locator('.question-item.next-step').getByRole('button', { name: 'Prepare a request', exact: true });
+    await expect(prepare).toBeInViewport({ ratio: 1 });
+    await expect(page.locator('.question-item.next-step p')).toHaveCSS('font-size', '16px');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const drawer = viewport.width <= 1000 || viewport.height <= 600;
+    if (drawer) await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+    const assistant = page.getByRole('complementary', { name: 'Simulated Alexa+ repair conversation', exact: true });
+    const input = assistant.getByRole('textbox', { name: 'Message to Relay', exact: true });
+    await expect(input).toBeInViewport({ ratio: 1 }); await expect(input).toHaveCSS('font-size', '16px');
+    for (const name of ['Send message', 'Enable spoken responses', 'Case brief', 'Tomorrow', 'Case packet']) {
+      const control = assistant.getByRole('button', { name, exact: true });
+      if (viewport.height <= 600 && ['Case brief', 'Tomorrow', 'Case packet'].includes(name)) { await expect(control).not.toBeVisible(); continue; }
+      await expect(control).toBeInViewport({ ratio: 1 });
+      const bounds = (await control.boundingBox())!; expect(bounds.width).toBeGreaterThanOrEqual(44); expect(bounds.height).toBeGreaterThanOrEqual(44);
+    }
+    const layout = await assistant.evaluate(element => {
+      const box = (selector: string) => { const r = element.querySelector(selector)!.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, width: r.width, height: r.height }; };
+      return { heading: box('.assistant-heading'), conversation: box('.conversation'), commands: box('.assistant-commands'), composer: box('.composer'), fits: element.scrollWidth <= element.clientWidth };
+    });
+    expect(layout.fits).toBe(true);
+    expect(layout.heading.bottom).toBeLessThanOrEqual(layout.conversation.top + 1);
+    expect(layout.conversation.bottom).toBeLessThanOrEqual((viewport.height <= 600 ? layout.composer : layout.commands).top + 1);
+    expect(layout.composer.height).toBeLessThanOrEqual(116);
+    expect(layout.conversation.height).toBeGreaterThanOrEqual(drawer ? 96 : viewport.height === 680 ? 200 : 400);
+    if (!drawer) {
+      expect((await page.locator('.sidebar').boundingBox())!.width).toBe(228);
+      expect(layout.heading.height).toBeLessThanOrEqual(68);
+      expect((await page.locator('.question-item.next-step').boundingBox())!.height).toBeLessThanOrEqual(236);
+    }
+    expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()).violations).toEqual([]);
+    await page.screenshot({ path: `.data/screenshots/${info.project.name}-density-${viewport.width}x${viewport.height}.png` });
+    measurements.push({ viewport, drawer, ...layout });
+  }
+  await mkdir('.data/verification/layout-density-2026-10-22', { recursive: true });
+  await writeFile(`.data/verification/layout-density-2026-10-22/${info.project.name}.json`, JSON.stringify(measurements, null, 2));
+});
+
 test('next action and Relay input fit the first screen across desktop, tablet and mobile', async ({ page }, info) => {
   test.setTimeout(120000);
   for (const viewport of [{ width: 1248, height: 680 }, { width: 1440, height: 900 }, { width: 768, height: 900 }, { width: 390, height: 844 }, { width: 1366, height: 600 }]) {

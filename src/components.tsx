@@ -72,7 +72,7 @@ export function Assistant({ messages, busy, suspended = false, settings, onSend,
     const element = panel.current;
     if (!element || element.closest('dialog')) return;
     // Fit the composer below the actual header, including wrapped titles or notices.
-    const fit = () => element.style.setProperty('--relay-height', `${Math.max(200, Math.min(560, innerHeight - Math.max(12, element.getBoundingClientRect().top) - 16))}px`);
+    const fit = () => element.style.setProperty('--relay-height', `${Math.max(200, Math.min(700, innerHeight - Math.max(12, element.getBoundingClientRect().top) - 16))}px`);
     const observer = new ResizeObserver(fit);
     for (const target of document.querySelectorAll('.workspace, .case-heading, .case-metrics, .topbar, .alert')) observer.observe(target);
     window.addEventListener('resize', fit); window.addEventListener('scroll', fit, { passive: true }); fit();

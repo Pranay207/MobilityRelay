@@ -80,6 +80,9 @@ app or a population estimate for all wheelchair users.
 The selected case survives reload in the same browser tab. New cases show a
 **Record first update** action; a missing recipient contact has a direct
 **Add contact** action beside the blocked request workflow.
+The compact desktop layout gives more space to the conversation, with a narrower
+sidebar and less header padding. Main reading text remains 16px and primary
+controls retain 44px targets. Narrow screens use a labelled evidence icon.
 New drafts ask the recipient direct questions rather than copying workspace
 instructions. Reviewed answers use readable source numbers linked to Evidence;
 technical record IDs remain available under **Record details**.
@@ -176,7 +179,7 @@ Windows, Node 24.11.0 and installed Microsoft Edge.
 | --- | --- |
 | TypeScript and production build | Passed. |
 | Backend | **188 tests passed**, including real HTTP/MCP calls, recipient-facing wording, separate spoken report text, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
-| Browser workflows | **100 regression checks passed** in the full run; **both new playback checks passed** after isolating their fictional test case. Coverage includes source navigation, request wording, speech lifecycle, approval, persistence, case isolation, responsive layout and accessibility. The initial test-fixture failure and separate rerun are recorded in the guide; this was not a single clean 102-check run. |
+| Browser workflows | **Both desktop/mobile density checks passed** across six viewport sizes each, including 320x700: conversation space, visible actions/input, 16px reading text, 44px targets and axe checks. The broader regression rerun was stopped at the user's request for speed; historical results and remaining limits are recorded in the guide. |
 | Accessibility and responsive layout | No automated violations in tested states. Keyboard focus, readable text, 44px header icon controls and desktop/mobile layout checks passed. |
 
 ```sh

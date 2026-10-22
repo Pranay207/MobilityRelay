@@ -444,6 +444,46 @@ not establish the native toolkit's sub-500 ms query target.
 
 ## 4. Testing and Latest Results
 
+### Compact Layout Pass: October 22
+
+Narrowed the desktop sidebar from 246px to 228px, tightened workspace padding
+and reduced the leading question's excess spacing. Relay now uses a compact
+title/provider header, a smaller two-line composer and a responsive height cap
+of 700px instead of 560px. It still fits below the actual case header; short
+windows and mobile use the conversation dialog. Main reading text remains
+16px and primary, voice, send and shortcut targets remain at least 44px.
+At 320px, **View evidence** becomes a familiar file icon with an accessible
+name and tooltip, avoiding an extra header row. Reduced mobile header/metric
+spacing keeps **Prepare a request** visible at 320x700 without hiding reports
+or shrinking reading text. No repair rules, approval or AI logic changed.
+
+Measured with the same fictional case and browser viewport before/after:
+
+| Viewport | Previous conversation height | New conversation height |
+| --- | --- | --- |
+| 1248x680 | 133px | 203px |
+| 1440x1000 | 263px | 461px |
+
+These are layout measurements, not user outcomes or audio/model performance.
+`npm run check` passed the production build and **188 backend tests**; a final
+production build/typecheck also passed after the narrow-screen correction.
+The new dedicated Edge check passed **2/2 projects in 59.2 seconds**, each
+covering 1248x680, 1440x1000, 1920x1080, 390x844, 320x700 and 1366x600.
+It checks visible actions/input, conversation capacity, text sizes, 44px targets,
+nonoverlapping regions, no horizontal overflow and automated accessibility.
+Measurements are saved in ignored `.data/verification/layout-density-2026-10-22/`.
+Desktop and narrow Relay screenshots were visually inspected. README images
+use a separate in-memory fictional server with real MCP reads and no delivery.
+
+The first exploratory run found the 320px action below the fold; that was fixed
+in the UI, not by weakening the assertion. A separate branding check timed out
+waiting for the case to load while another screenshot server was running; its
+cause was not established. The longer rerun was stopped after three passing
+desktop checks when the user requested a faster finish. It was not a completed
+32-check run, and the branding load timeout was not fully reinvestigated.
+The full browser suite, physical audio, independent usability, fresh install,
+Docker, actual SMTP and native Alexa+ were not reverified by this layout pass.
+
 ### Message Wording and Readable Sources: October 22
 
 Updated newly prepared messages to address the recipient directly instead of
