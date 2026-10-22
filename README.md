@@ -78,7 +78,13 @@ app or a population estimate for all wheelchair users.
 6. **Follow up and export:** save local due items and download an attributed HTML/JSON history, with optional known-identity redaction. Exports identify stale drafts and use readable source numbers; HTML source links lead to the corresponding history entries.
 
 English speech input and spoken replies are optional; text and forms remain
-available. Reply recognition is deliberately narrow: supported insurer receipt
+available. Dictation shows live words, keeps listening across speech segments,
+and requires a separate send action. Manual editing cancels recording. Browser
+speech-service and microphone accuracy still need physical verification.
+Relay can read the latest supplier or insurer report, or compare
+both with dated source numbers. Corrected records are excluded and long reports
+are labelled as excerpts. Unsupported local questions receive an explicit
+limitation instead of an unrelated summary. Reply recognition is deliberately narrow: supported insurer receipt
 statements and supplier appointment confirmations with an explicit date, time
 and UTC offset. Ambiguous wording remains evidence only. No connected inbox or
 independent verification is claimed.
@@ -128,6 +134,10 @@ Start with **Power chair repair**: inspect the receipt question, prepare a
 request, review its sources and export the history. In Relay, **Case brief**
 reads the case through MCP.
 
+Try **"What did the supplier say?"** or **"Compare the supplier and insurer
+reports"** for attributed evidence, without a model wait. These are reported
+statements, not a verdict on responsibility or a prediction of approval.
+
 <details>
 <summary>Optional local AI with Ollama</summary>
 
@@ -155,8 +165,8 @@ Windows, Node 24.11.0 and installed Microsoft Edge.
 | Check | Recorded result |
 | --- | --- |
 | TypeScript and production build | Passed. |
-| Backend | **178 tests passed**, including real HTTP/MCP calls, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
-| Browser workflows | **78/78 passed** in one 7.2-minute desktop/mobile run, including delayed startup, silent historical messages, stale previews, complete case workflows and exported source links. No retries, skips or relaxed assertions/timeouts. |
+| Backend | **183 tests passed**, including real HTTP/MCP calls, grounded report reads, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
+| Browser workflows | **16 focused desktop/mobile checks passed**, including live dictation and speech recovery. The expanded 88-check run was stopped at the user's request to expedite after **58 passing checks** (all 44 desktop and 14 mobile); it is not a complete pass. The previous implementation passed 78/78. No assertions or timeouts were relaxed. |
 | Accessibility and responsive layout | No automated violations in tested states. Keyboard focus, readable text, 44px header icon controls and desktop/mobile layout checks passed. |
 
 ```sh

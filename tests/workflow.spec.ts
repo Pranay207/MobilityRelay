@@ -17,13 +17,13 @@ async function mockSpeech(page: Page, result: { transcript?: string; error?: str
 
 async function mockVoiceLifecycle(page: Page) {
   await page.addInitScript(() => {
-    const state = { sessions: [] as { result: ((event: { resultIndex: number; results: { transcript: string }[][] }) => void) | null; end: (() => void) | null }[], languages: [] as string[], aborted: 0, spoken: [] as string[], spokenLanguages: [] as string[], speaking: false };
+    const state = { sessions: [] as { result: ((event: { resultIndex: number; results: { transcript: string }[][] }) => void) | null; end: (() => void) | null }[], languages: [] as string[], recordingModes: [] as { continuous: boolean; interimResults: boolean }[], aborted: 0, spoken: [] as string[], spokenLanguages: [] as string[], speaking: false };
     class TestRecognition {
       lang = ''; continuous = false; interimResults = false;
       onresult: ((event: { resultIndex: number; results: { transcript: string }[][] }) => void) | null = null;
       onerror: ((event: { error: string }) => void) | null = null;
       onend: (() => void) | null = null;
-      start() { state.languages.push(this.lang); state.sessions.push({ result: this.onresult, end: this.onend }); }
+      start() { state.languages.push(this.lang); state.recordingModes.push({ continuous: this.continuous, interimResults: this.interimResults }); state.sessions.push({ result: this.onresult, end: this.onend }); }
       stop() { this.onend?.(); }
       abort() { state.aborted++; this.onend?.(); }
     }
@@ -35,6 +35,111 @@ async function mockVoiceLifecycle(page: Page) {
     Object.assign(window, { voiceLifecycle: state });
   });
 }
+
+test('live dictation replaces interim words, preserves segments and never sends itself', async ({ page }, info) => {
+  await mockVoiceLifecycle(page);
+  let submitted = 0; page.on('request', request => { if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/agent') submitted++; });
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+  const text = page.getByRole('textbox', { name: 'Message to Relay' });
+  await text.fill('Record:'); await page.getByRole('button', { name: 'Start voice input', exact: true }).click();
+  expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { recordingModes: unknown[] } }).voiceLifecycle.recordingModes)).toEqual([{ continuous: true, interimResults: true }]);
+  const emit = (segments: string[], resultIndex = 0, session = 0) => page.evaluate(({ segments, resultIndex, session }) => {
+    const state = (window as unknown as { voiceLifecycle: { sessions: { result: (event: { resultIndex: number; results: { transcript: string }[][] }) => void }[] } }).voiceLifecycle;
+    state.sessions[session].result({ resultIndex, results: segments.map(transcript => [{ transcript }]) });
+  }, { segments, resultIndex, session });
+  await emit(['the supplier sent']); await expect(text).toHaveValue('Record: the supplier sent');
+  await emit(['the supplier said']); await expect(text).toHaveValue('Record: the supplier said');
+  await emit(['the supplier said', 'the paperwork was sent'], 1);
+  await expect(text).toHaveValue('Record: the supplier said the paperwork was sent');
+  await page.getByRole('button', { name: 'Stop recording', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Start voice input', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Start voice input', exact: true }).click();
+  await emit(['yesterday'], 0, 1); await expect(text).toHaveValue('Record: the supplier said the paperwork was sent yesterday');
+  await text.fill('Manual correction');
+  await expect(page.getByRole('button', { name: 'Start voice input', exact: true })).toBeVisible();
+  await emit(['late unwanted words'], 0, 1); await expect(text).toHaveValue('Manual correction');
+  await page.getByRole('button', { name: 'Start voice input', exact: true }).click();
+  await emit(['x'.repeat(4100)], 0, 2);
+  expect((await text.inputValue()).length).toBe(4000);
+  await expect(page.getByRole('alert').filter({ hasText: '4000-character limit' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start voice input', exact: true })).toBeVisible();
+  expect(submitted).toBe(0);
+});
+
+test('specific report questions show dated sources and unsupported questions stay honest', async ({ page }, info) => {
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Message to Relay' }).fill('Compare the supplier and insurer reports');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  const answer = page.getByRole('log').locator('.message-assistant').last();
+  await expect(answer).toContainText('Latest supplier report, Source'); await expect(answer).toContainText('Latest insurer report, Source');
+  await expect(answer).toContainText('not independently verified'); await expect(answer).toContainText('do not establish who is at fault');
+  await page.getByRole('textbox', { name: 'Message to Relay' }).fill('Will my insurer approve coverage?');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(page.getByRole('log').locator('.message-assistant').last()).toContainText('cannot answer that specific question');
+  await page.screenshot({ path: `.data/screenshots/${info.project.name}-grounded-conversation.png`, fullPage: true });
+});
+
+test('speech service errors preserve typed text and never submit or write evidence', async ({ page }, info) => {
+  await mockSpeech(page, { error: 'network' });
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+  const text = page.getByRole('textbox', { name: 'Message to Relay' });
+  const messageCount = await page.getByRole('log').locator('.message').count();
+  await text.fill('My unfinished repair question');
+  await page.getByRole('button', { name: 'Start voice input', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'The speech service could not connect.' }).first()).toBeVisible();
+  await expect(text).toHaveValue('My unfinished repair question');
+  await expect(page.getByRole('button', { name: 'Start voice input', exact: true })).toBeEnabled();
+  await expect(page.getByRole('log').locator('.message')).toHaveCount(messageCount);
+});
+
+test('failed spoken output leaves a readable reply and ignores old playback errors', async ({ page }, info) => {
+  await page.addInitScript(() => {
+    const utterances: SpeechSynthesisUtterance[] = [];
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
+      cancel() {}, speak(utterance: SpeechSynthesisUtterance) { utterances.push(utterance); },
+    } });
+    Object.assign(window, { testUtterances: utterances });
+  });
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+  await page.getByRole('button', { name: 'Enable spoken responses', exact: true }).click();
+  await page.getByRole('button', { name: 'Case brief', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { testUtterances: unknown[] }).testUtterances.length)).toBe(1);
+  await page.evaluate(() => {
+    const utterance = (window as unknown as { testUtterances: SpeechSynthesisUtterance[] }).testUtterances[0];
+    utterance.onerror?.({ error: 'audio-busy' } as SpeechSynthesisErrorEvent);
+  });
+  await expect(page.getByRole('alert').filter({ hasText: 'Spoken response could not play.' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Enable spoken responses', exact: true })).toBeVisible();
+  await expect(page.getByRole('log').locator('.message-assistant').last()).toContainText('user-maintained record');
+  await page.getByRole('button', { name: 'Enable spoken responses', exact: true }).click();
+  await page.getByRole('button', { name: 'Case brief', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { testUtterances: unknown[] }).testUtterances.length)).toBe(2);
+  await page.evaluate(() => {
+    const utterance = (window as unknown as { testUtterances: SpeechSynthesisUtterance[] }).testUtterances[0];
+    utterance.onerror?.({ error: 'network' } as SpeechSynthesisErrorEvent);
+  });
+  await expect(page.getByRole('button', { name: 'Mute spoken responses', exact: true })).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('speech startup failures are contained and missing output is disabled', async ({ page }, info) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: class { constructor() { throw new Error('Fictional microphone constructor failed'); } } });
+    Object.defineProperty(window, 'SpeechSynthesisUtterance', { configurable: true, value: undefined });
+  });
+  const pageErrors: string[] = []; page.on('pageerror', error => pageErrors.push(error.message));
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Spoken responses unavailable', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Start voice input', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'The microphone could not start.' }).first()).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Message to Relay' })).toBeEnabled();
+  expect(pageErrors).toEqual([]);
+});
 
 test('slow initial history cannot be mistaken for a new spoken reply', async ({ page }, info) => {
   await mockVoiceLifecycle(page);

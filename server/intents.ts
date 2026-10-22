@@ -4,6 +4,13 @@ export function commandText(input: string) {
   return input.trim().replace(/^(?:alexa|relay)\s*[,.:]?\s+/i, '').replace(/^(?:(?:please|can you|could you|would you)\s+){1,3}/i, '').trim();
 }
 
+export function reportCommand(input: string): 'supplier' | 'insurer' | 'both' | null {
+  const text = commandText(input).replace(/[.!?]+$/, '').trim().replace(/\s+/g, ' ');
+  const party = /^(?:what did (?:the |my )?(supplier|insurer) (?:say|report)|(?:show|read) (?:me )?(?:the |my )?(?:latest )?(supplier|insurer) (?:report|update))$/i.exec(text);
+  if (party) return (party[1] ?? party[2]).toLowerCase() as 'supplier' | 'insurer';
+  return /^(?:compare (?:the |my )?(?:supplier and insurer|insurer and supplier) (?:reports|updates)|(?:show|read) (?:me )?(?:the |my )?(?:latest )?reports from both (?:sides|parties))$/i.test(text) ? 'both' : null;
+}
+
 export function directCaseCommand(input: string): 'read' | 'export' | null {
   const text = commandText(input).replace(/[.!?]+$/, '').trim().replace(/\s+/g, ' ');
   if ([
@@ -20,7 +27,7 @@ export function localIntent(input: string): 'blocked' | 'read' | 'record' | 'rep
   const text = commandText(input);
   if (/^(?:don't|do not|not|no|never|stop|cancel)\b/i.test(text)) return 'blocked';
   if (/^(?:review (?:a |the |this )?reply|(?:the |my )?(?:insurer|supplier) replied)\b/i.test(text)) return 'reply';
-  if (/^(?:what|who|why|when|where|how|is|are|did|does|do|has|have|show|tell me|status|summary|next step)\b/i.test(text)) return 'read';
+  if (/^(?:what|who|why|when|where|how|is|are|did|does|do|has|have|can|could|should|will|would|show|tell me|status|summary|next step)\b/i.test(text)) return 'read';
   if (/^(?:record|log|note that|add (?:an? )?update|(?:the |my )?(?:supplier|insurer) (?:said|says|told me))\b/i.test(text)) return 'record';
   if (/^(?:send|email it|approve)\b/i.test(text)) return 'send';
   if (/^(?:export|download|(?:make|prepare) (?:a |the |my )?case (?:packet|history))\b/i.test(text)) return 'export';

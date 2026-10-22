@@ -360,6 +360,7 @@ No new cloud/model call, library, seventh MCP tool or automatic message is added
 
 ### AI Is Bounded; Actions Are Reviewed
 
+- Whole-request supplier/insurer report queries read the current MCP brief without inference. They quote the latest non-superseded report by occurrence time, with stable source number, source name, channel and UTC date. Long text is explicitly an excerpt. Comparing reports never establishes fault; absent reports are stated as missing. Unsupported local questions no longer receive a generic status answer.
 - Model-assisted operations in both AI modes discover the real MCP catalog. Supported status/next-step/follow-up reads and redacted HTML history exports call real MCP without inference in every mode. Exact whole-request matching keeps compound requests and different formats on their existing bounded path; there is no case-result cache.
 - Bedrock consent is enforced immediately before the model path. Local commands do not share case text or require cloud consent; a genuine model request without consent still receives 403. The composer lets the server decide rather than disabling all typed requests in Bedrock mode.
 - The host injects the active case, restricts requested operations and resolves short case-scoped contact/question references to real IDs.
@@ -424,6 +425,58 @@ not establish the native toolkit's sub-500 ms query target.
 [Alexa+ quickstart](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-quickstart.html).
 
 ## 4. Testing and Latest Results
+
+### Grounded Conversation and Speech Recovery: October 22
+
+Added bounded, read-only answers for `What did the supplier say?`,
+`Read the latest insurer report` and `Compare the supplier and insurer reports`.
+They use real MCP case data in all three agent modes without inference, new
+consent requirements or writes. Corrected records are excluded; adding an older
+report later does not make it the latest report. Quotes remain attributed and
+untrusted. This does not expand the app into general natural-language Q&A.
+
+Speech startup exceptions are contained, microphone/service errors preserve
+typed text, and failed playback leaves the written response available. Missing
+speech-output APIs disable that control. Output failures reset the opt-in toggle;
+late errors from an old utterance cannot alter the current playback state.
+Controlled speech tests are not physical microphone or speaker verification.
+
+After the user reported poor microphone capture, changed dictation to continuous
+English (`en-IN`) with live interim results. Revisions replace earlier interim
+words; multiple final segments are preserved rather than reading only the first
+changed result. Stop remains explicit, manual editing cancels recording, and
+voice never submits itself. Recording also stops at the message-length limit
+with a visible warning. These changes address application capture behavior,
+not browser-service accuracy, permissions or microphone hardware. Physical
+capture is an open issue until the user retests successfully.
+
+An initial backend run caught missing question routing for `Will my insurer
+approve coverage?`; it now gets the explicit local limitation rather than a
+generic fallback. The first focused browser run passed five of eight checks;
+three failures were test assumptions about persisted history or clicking a
+desktop control behind the mobile dialog. The tests now compare the existing
+message count and exercise recovery through the active conversation. No
+assertion deadlines were extended.
+
+The subsequent 86-check full browser run was deliberately stopped after 46
+passing checks to address that microphone report. It was not a completed pass.
+
+Final verification after the microphone changes: `npm run check` passed the
+production build and **183/183 backend tests**. The focused Edge run passed
+**16/16 desktop/mobile checks in 1.9 minutes**, including continuous/interim
+dictation, revised words, multiple segments, manual corrections, the length
+limit, no automatic submission, source reads, input/output failures, stale
+callbacks, reviewed evidence and permission denial.
+
+The expanded **88-check** run then passed all **44 desktop** checks and the
+first **14 mobile** checks, with no assertion failures, before being deliberately
+stopped when the user asked to finish faster. Thus **58 checks passed; the full
+run is incomplete**, not 88/88. No retries, skipped tests or relaxed assertions
+are counted as success. The previous implementation's complete 78/78 result is
+historical and does not substitute for the remaining 30 checks on these changes.
+The capture-only preview was restarted on port 4317 with the existing fictional
+database. No new live-model, SMTP, AWS, native Alexa+, physical-audio or
+independent-usability success is claimed.
 
 ### Export and Startup Fixes: October 22
 
@@ -1080,6 +1133,7 @@ Focus on completing evidence and submission, not adding unrelated features.
 - [x] Match exported numbered citations to linked, readable attributed-history source labels (October 22).
 - [x] Remove the verified chat-history startup dependency and parallelize settings/case-list loading; delayed/error-history and speech-history regressions pass. Earlier intermittent wait failures do not have a conclusively established root cause.
 - [ ] Verify physical microphone, audible replies and keyboard/screen-reader usability.
+- [x] Ground supported supplier/insurer read questions in dated MCP sources; make unsupported local questions explicit and contain speech-service/playback failures (October 22). Physical verification is still required for hardware claims.
 - [x] Remove model waits for supported case reads and redacted HTML history exports; October 19 working-tree verification is recorded above.
 - [ ] Review broader model behavior and slow complex requests; the spot checks do not establish general accuracy or fast inference.
 - [ ] Recommended, not compulsory: complete an unfamiliar person's fictional task; record failures and feedback.
@@ -1120,7 +1174,7 @@ evidence map, not a winning probability or promise of full marks.
 | Time | Show and say |
 | --- | --- |
 | 0:00-0:15 | Open Maya's labelled fictional case. "MobilityRelay is a simulated Alexa+ repair assistant with a real MCP server. The supplier reports sending an estimate; the insurer reports not locating it." |
-| 0:15-0:35 | Expand Reported paperwork updates and show both dated sources and the receipt question. "We don't decide who's at fault. We ask what information is missing." |
+| 0:15-0:35 | Ask/type "Compare the supplier and insurer reports" in Relay. Show its real MCP trace, dated source numbers and both quotations; open Evidence for the full text. "We don't decide who's at fault. We ask what information is missing." |
 | 0:35-0:55 | Prepare an initial receipt request using the question's control. Show real `prepare_repair_request` trace and exact source-backed wording. Leave it unapproved. |
 | 0:55-1:20 | Say/type "The insurer replied: We received the estimate. Reference AB-47. Authorization is still pending." Label this a fictional reply. Confirm source/date, add the reply reference and open Preview changes. No evidence is saved yet. |
 | 1:20-1:40 | Show the exact receipt quotation. Select the receipt answer and explicitly confirm. "Received is not approved. Authorization is still unanswered." Show the real `record_repair_event` trace and persistent What changed summary. |

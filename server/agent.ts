@@ -6,7 +6,7 @@ import type { ToolCaller } from './mcp.js';
 import { mcpCatalog } from './mcp.js';
 import { AppError } from './store.js';
 import { toolSchemas, type ToolName } from './schemas.js';
-import { commandText, directCaseCommand, localIntent, proposesTomorrow, proposeReply, proposeUpdate, requestQuestionKinds } from './intents.js';
+import { commandText, directCaseCommand, localIntent, proposesTomorrow, proposeReply, proposeUpdate, reportCommand, requestQuestionKinds } from './intents.js';
 import { ollamaConverse } from './ollama.js';
 
 export type { AgentReply } from '../shared/types.js';
@@ -16,6 +16,8 @@ export async function respond(input: { caseId: string; text: string; allowCloud:
   const traces: ToolTrace[] = [];
   const brief = await call<Brief>('get_repair_brief', { caseId: input.caseId }, traces);
   const intent = localIntent(input.text);
+  const report = reportCommand(input.text);
+  if (report) return { reply: reportedReply(brief, report), traces };
   if (intent === 'read' && /\b(?:have|did)\s+you\b/i.test(input.text) && /\b(?:sent|send|emailed|delivered)\b/i.test(input.text)) {
     const labels: Record<Draft['status'], string> = { draft: 'awaiting approval', captured: 'captured locally, not delivered', sent: 'SMTP accepted, receipt unconfirmed', sending: 'delivery in progress', unknown: 'delivery outcome unknown', failed: 'failed' };
     const statuses = Object.entries(labels).flatMap(([status, label]) => { const count = brief.drafts.filter(draft => draft.status === status).length; return count ? [`${count} ${label}`] : []; });
@@ -67,9 +69,25 @@ export async function respond(input: { caseId: string; text: string; allowCloud:
     return { reply: `A request to ${contact.name} is ready for review. Nothing has been sent.`, draftId: draft.id, traces };
   }
   if (intent === 'read') {
-    return { reply: caseReadReply(brief, text), traces };
+    if (/\b(?:reminders?|follow[- ]?ups?)\b/i.test(text)) return { reply: 'I cannot apply that follow-up filter in local command mode. No new reminder was created. Ask to list follow-ups, or review their dates in Follow-ups.', traces };
+    return { reply: 'I cannot answer that specific question in local command mode. No change was made. I can show the case brief, read the latest supplier or insurer report, or compare their reports. For other questions, review Evidence or use the configured AI mode.', traces };
   }
-  return { reply: 'I could not match that request to a repair action. No change was made. What would you like to clarify about this case?', traces };
+  return { reply: 'I could not match that request to a repair action. No change was made. You can ask for the case brief or latest supplier report, or use the reviewed case controls.', traces };
+}
+
+function reportedReply(brief: Brief, target: 'supplier' | 'insurer' | 'both') {
+  const superseded = new Set(brief.events.flatMap(event => event.supersedesId ? [event.supersedesId] : []));
+  const parties = target === 'both' ? ['supplier', 'insurer'] as const : [target];
+  const reports = parties.map(party => {
+    const latest = brief.events.filter(event => event.party === party && !superseded.has(event.id)).reverse()
+      .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || Date.parse(b.recordedAt) - Date.parse(a.recordedAt))[0];
+    if (!latest) return `No current ${party} report is recorded in this case.`;
+    const source = brief.events.findIndex(event => event.id === latest.id) + 1;
+    const date = new Date(latest.occurredAt).toISOString().slice(0, 10);
+    const excerpt = latest.text.length > 280 ? `${latest.text.slice(0, 280)}... [excerpt]` : latest.text;
+    return `Latest ${party} report, Source ${source}, ${date} (UTC), ${latest.source}, ${latest.channel}: "${excerpt}"`;
+  });
+  return `${reports.join('\n')} These are attributed reports, not independently verified facts. ${target === 'both' ? 'Different reports do not establish who is at fault. ' : ''}Read the full records in Evidence.`;
 }
 
 function caseReadReply(brief: Brief, text: string) {

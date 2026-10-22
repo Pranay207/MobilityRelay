@@ -33,7 +33,7 @@ export function Modal({ title, children, onClose, wide = false }: { title: strin
   return <dialog ref={dialog} className={`modal ${wide ? 'wide' : ''}`} aria-label={title} onClick={event => { if (!busy && event.target === event.currentTarget) onClose(); }}><div className="modal-header"><h2>{title}</h2><IconButton label="Close dialog" onClick={onClose} disabled={busy}><X size={20} /></IconButton></div>{error && <p className="dialog-error" role="alert">{error}</p>}{children}</dialog>;
 }
 
-interface RecognitionResult { results: { [index: number]: { [index: number]: { transcript: string } } }; resultIndex: number }
+interface RecognitionResult { results: ArrayLike<{ isFinal?: boolean; [index: number]: { transcript: string } }>; resultIndex: number }
 interface Recognition { lang: string; continuous: boolean; interimResults: boolean; onresult: ((event: RecognitionResult) => void) | null; onerror: ((event: { error: string }) => void) | null; onend: (() => void) | null; start(): void; stop(): void; abort(): void }
 type VoiceWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
 const cancelSpeech = () => { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); };
@@ -49,8 +49,11 @@ function WaitingStatus() {
 export function Assistant({ messages, busy, suspended = false, settings, onSend, onError }: { messages: ChatMessage[]; busy: boolean; suspended?: boolean; settings: Settings | null; onSend: (text: string, cloud: boolean) => Promise<void>; onError: (text: string) => void }) {
   const [text, setText] = useState(''); const [listening, setListening] = useState(false); const [sound, setSound] = useState(false); const [cloud, setCloud] = useState(false);
   const recognition = useRef<Recognition | null>(null); const end = useRef<HTMLDivElement>(null); const lastSpoken = useRef(messages.at(-1)?.id ?? '');
+  const speaking = useRef<SpeechSynthesisUtterance | null>(null);
+  const stopSpeech = useCallback(() => { speaking.current = null; cancelSpeech(); }, []);
   const panel = useRef<HTMLElement>(null);
   const Voice = (window as VoiceWindow).SpeechRecognition ?? (window as VoiceWindow).webkitSpeechRecognition;
+  const canSpeak = typeof window.speechSynthesis?.speak === 'function' && typeof window.SpeechSynthesisUtterance === 'function';
   const cancelVoice = useCallback(() => {
     const voice = recognition.current; recognition.current = null;
     if (!voice) return;
@@ -76,33 +79,66 @@ export function Assistant({ messages, busy, suspended = false, settings, onSend,
     return () => { observer.disconnect(); window.removeEventListener('resize', fit); window.removeEventListener('scroll', fit); };
   }, []);
   useEffect(() => { if (busy || suspended) { cancelVoice(); setListening(false); } }, [busy, suspended, cancelVoice]);
-  useEffect(() => { if (!sound || busy || suspended || listening) cancelSpeech(); }, [sound, busy, suspended, listening]);
+  useEffect(() => { if (!sound || busy || suspended || listening) stopSpeech(); }, [sound, busy, suspended, listening, stopSpeech]);
   useEffect(() => {
     const last = messages.at(-1);
     if (busy || !last || last.id === lastSpoken.current) return;
     lastSpoken.current = last.id;
-    if (sound && !suspended && !listening && !document.hidden && last.role === 'assistant' && 'speechSynthesis' in window) {
-      cancelSpeech(); const utterance = new SpeechSynthesisUtterance(last.text); utterance.lang = 'en-IN'; window.speechSynthesis.speak(utterance);
+    if (sound && !suspended && !listening && !document.hidden && last.role === 'assistant' && canSpeak) {
+      stopSpeech();
+      try {
+        const utterance = new SpeechSynthesisUtterance(last.text); utterance.lang = 'en-IN'; speaking.current = utterance;
+        utterance.onend = () => { if (speaking.current === utterance) speaking.current = null; };
+        utterance.onerror = event => {
+          if (speaking.current !== utterance) return;
+          speaking.current = null;
+          if (event.error === 'canceled' || event.error === 'interrupted') return;
+          setSound(false); onError('Spoken response could not play. The reply is still available in the conversation.');
+        };
+        window.speechSynthesis.speak(utterance);
+      } catch { stopSpeech(); setSound(false); onError('Spoken response could not start. The reply is still available in the conversation.'); }
     }
-  }, [messages, sound, busy, suspended, listening]);
+  }, [messages, sound, busy, suspended, listening, canSpeak, stopSpeech, onError]);
   useEffect(() => {
-    const hide = () => { if (document.hidden) { cancelVoice(); setListening(false); cancelSpeech(); } };
+    const hide = () => { if (document.hidden) { cancelVoice(); setListening(false); stopSpeech(); } };
     document.addEventListener('visibilitychange', hide);
-    return () => { document.removeEventListener('visibilitychange', hide); cancelVoice(); cancelSpeech(); };
-  }, [cancelVoice]);
+    return () => { document.removeEventListener('visibilitychange', hide); cancelVoice(); stopSpeech(); };
+  }, [cancelVoice, stopSpeech]);
   const toggleVoice = () => {
     if (busy || suspended) return;
-    if (listening) { recognition.current?.stop(); return; }
+    if (listening) { try { recognition.current?.stop(); } catch { cancelVoice(); setListening(false); onError('Recording stopped. Your transcript is still available to review.'); } return; }
     if (!Voice) { onError('Voice input is unavailable in this browser. Text input remains available.'); return; }
-    cancelVoice(); cancelSpeech();
-    const voice = new Voice(); voice.lang = 'en-IN'; voice.continuous = false; voice.interimResults = false;
-    voice.onresult = event => { if (recognition.current !== voice) return; const transcript = event.results[event.resultIndex][0].transcript; setText(prior => prior ? `${prior} ${transcript}` : transcript); };
-    voice.onerror = event => { if (recognition.current !== voice) return; cancelVoice(); setListening(false); onError(event.error === 'not-allowed' ? 'Microphone access was denied. You can use text instead.' : `Voice input stopped: ${event.error}.`); };
-    voice.onend = () => { if (recognition.current !== voice) return; recognition.current = null; setListening(false); }; recognition.current = voice;
-    try { voice.start(); setListening(true); } catch { cancelVoice(); setListening(false); onError('The microphone could not start. Try again or use text.'); }
+    cancelVoice(); stopSpeech();
+    try {
+      const voice = new Voice(); voice.lang = 'en-IN'; voice.continuous = true; voice.interimResults = true;
+      const prefix = text.trimEnd();
+      voice.onresult = event => {
+        if (recognition.current !== voice) return;
+        // Results contain the whole recording, including revised interim words.
+        const transcript = Array.from(event.results, result => result[0]?.transcript.trim() ?? '').filter(Boolean).join(' ');
+        if (transcript) {
+          const combined = prefix ? `${prefix} ${transcript}` : transcript;
+          setText(combined.slice(0, 4000));
+          if (combined.length > 4000) { cancelVoice(); setListening(false); onError('The voice transcript reached the 4000-character limit. Review it before sending.'); }
+        }
+      };
+      voice.onerror = event => {
+        if (recognition.current !== voice) return; cancelVoice(); setListening(false);
+        const errors: Record<string, string> = {
+          'not-allowed': 'Microphone access was denied. You can use text instead.',
+          'service-not-allowed': 'Voice input is blocked by the browser or speech service. You can use text instead.',
+          'audio-capture': 'No microphone is available. Connect a microphone or use text instead.',
+          'no-speech': 'No speech was detected. Try again or use text instead.',
+          network: 'The speech service could not connect. Your typed text is unchanged; try again or use text.',
+        };
+        if (event.error !== 'aborted') onError(errors[event.error] ?? 'Voice input stopped. Try again or use text instead.');
+      };
+      voice.onend = () => { if (recognition.current !== voice) return; recognition.current = null; setListening(false); }; recognition.current = voice;
+      voice.start(); setListening(true);
+    } catch { cancelVoice(); setListening(false); onError('The microphone could not start. Try again or use text.'); }
   };
-  const submit = async (value: string) => { if (!value.trim() || busy || suspended) return; cancelVoice(); setListening(false); cancelSpeech(); const prior = text; setText(''); try { await onSend(value.trim(), cloud); } catch { setText(prior || value); } };
-  return <aside ref={panel} className="assistant" aria-label="Simulated Alexa+ repair conversation"><div className="assistant-heading"><div className="relay-icon"><AudioLines size={22} /></div><div><h2>Relay</h2><span className="simulator-label">Alexa+ experience simulator</span><span>{agentLabel(settings)}</span></div><IconButton label={sound ? 'Mute spoken responses' : 'Enable spoken responses'} onClick={() => { if (sound && 'speechSynthesis' in window) speechSynthesis.cancel(); setSound(!sound); }}><span>{sound ? <Volume2 size={19} /> : <VolumeX size={19} />}</span></IconButton></div>
+  const submit = async (value: string) => { if (!value.trim() || busy || suspended) return; cancelVoice(); setListening(false); stopSpeech(); const prior = text; setText(''); try { await onSend(value.trim(), cloud); } catch { setText(prior || value); } };
+  return <aside ref={panel} className="assistant" aria-label="Simulated Alexa+ repair conversation"><div className="assistant-heading"><div className="relay-icon"><AudioLines size={22} /></div><div><h2>Relay</h2><span className="simulator-label">Alexa+ experience simulator</span><span>{agentLabel(settings)}</span></div><IconButton label={!canSpeak ? 'Spoken responses unavailable' : sound ? 'Mute spoken responses' : 'Enable spoken responses'} disabled={!canSpeak} onClick={() => { if (sound) stopSpeech(); setSound(!sound); }}><span>{sound ? <Volume2 size={19} /> : <VolumeX size={19} />}</span></IconButton></div>
     <div className={`conversation ${!messages.length && !busy ? 'is-empty' : ''}`} role="log" aria-label="Repair conversation" aria-live="polite">
       {!messages.length && !busy && <p className="assistant-empty">No messages yet</p>}
       {messages.map(message => <div key={message.id} className={`message message-${message.role}`}><span className="message-author">{message.role === 'assistant' ? 'Relay' : 'You'}</span><p>{message.text}</p>{message.traces.length > 0 && <details className="tool-trace"><summary><Terminal size={12} /> {message.traces.length} MCP {message.traces.length === 1 ? 'call' : 'calls'}</summary>{message.traces.map((t, i) => <div key={i}><span>{t.tool}</span><span>{t.ok ? `${t.durationMs} ms` : 'Failed'}</span></div>)}</details>}</div>)}
@@ -110,7 +146,7 @@ export function Assistant({ messages, busy, suspended = false, settings, onSend,
     </div>
     <div className="assistant-commands"><button disabled={busy} onClick={() => void submit('What is the next step?')}><FileText size={14} /> Case brief</button><button disabled={busy} onClick={() => void submit('Remind me tomorrow')}><Clock size={14} /> Tomorrow</button><button disabled={busy} onClick={() => void submit('Export my case history')}><Download size={14} /> Case packet</button></div>
     {settings?.agentMode === 'bedrock' && <label className="checkline cloud-consent"><input type="checkbox" checked={cloud} onChange={e => setCloud(e.target.checked)} /> Share this case text with Amazon Bedrock</label>}
-    <form className="composer" onSubmit={e => { e.preventDefault(); void submit(text); }}><textarea aria-label="Message to Relay" placeholder="Ask about this repair..." value={text} onChange={e => setText(e.target.value)} maxLength={4000} rows={2} disabled={busy} /><div className="composer-bottom"><IconButton label={listening ? 'Stop recording' : Voice ? 'Start voice input' : 'Voice input unavailable'} onClick={toggleVoice} disabled={!Voice || busy} className={listening ? 'listening' : ''}>{listening ? <MicOff size={19} /> : <Mic size={19} />}</IconButton><span>{listening ? 'Listening...' : 'English'}</span><button className="send-button" aria-label="Send message" title="Send message" disabled={!text.trim() || busy}><Send size={18} /></button></div></form>
+    <form className="composer" onSubmit={e => { e.preventDefault(); void submit(text); }}><textarea aria-label="Message to Relay" placeholder="Ask about this repair..." value={text} onChange={e => { if (listening) { cancelVoice(); setListening(false); } setText(e.target.value); }} maxLength={4000} rows={2} disabled={busy} /><div className="composer-bottom"><IconButton label={listening ? 'Stop recording' : Voice ? 'Start voice input' : 'Voice input unavailable'} onClick={toggleVoice} disabled={!Voice || busy} className={listening ? 'listening' : ''}>{listening ? <MicOff size={19} /> : <Mic size={19} />}</IconButton><span role="status">{listening ? 'Listening...' : 'English'}</span><button className="send-button" aria-label="Send message" title="Send message" disabled={!text.trim() || busy}><Send size={18} /></button></div></form>
   </aside>;
 }
 export function Traces({ traces }: { traces: ToolTrace[] }) { return <div className="trace-list">{traces.length ? traces.map((t, i) => <div key={i}><Terminal size={15} /><span>{t.tool}</span><strong className={t.ok ? 'good' : 'bad'}>{t.ok ? `${t.durationMs} ms` : 'Failed'}</strong></div>) : <p>No tool calls recorded in this browser session.</p>}</div>; }
