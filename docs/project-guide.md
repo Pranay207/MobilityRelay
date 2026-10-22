@@ -413,6 +413,44 @@ not establish the native toolkit's sub-500 ms query target.
 
 ## 4. Testing and Latest Results
 
+### Application Review: October 22
+
+Rechecked the application after the README/branding updates; no feature code
+changed during this review. The production build and **174 backend tests passed**.
+Vite emitted dependency-scanner shutdown diagnostics during isolated security-test
+teardown; the suite returned success with no failed assertions.
+
+The full Edge browser run passed **69/70 checks in 8.3 minutes**. One desktop
+stale-preview test exceeded its five-second wait for the initial **Power chair
+repair** heading, before selecting the test case or opening reply review.
+Its final snapshot showed the case, but the cause of the delay is not established.
+The trace is preserved locally at
+`.data/verification/ui-review-2026-10-22/initial-load-failure-trace.zip`.
+A fresh run passed all **four desktop/mobile stale-preview and complete-case
+checks in 1.2 minutes**, with no assertion/timeout changes. This does not establish
+an uninterrupted 70/70 run or fix the initial-load timing issue.
+
+Desktop/mobile screenshots of the overview, conversation and reply review were
+inspected. Checks covered accessible dialogs, responsive layout, source expansion,
+reply/appointment review, exact-message approval, local capture, due-item persistence,
+export, deletion, case isolation and controlled speech callbacks. Physical voice,
+independent usability, real email, AWS and native Alexa+ remain unverified.
+
+The scripted fictional task also completed with **zero page errors or failed
+requests** and successful traces for all six MCP tools. Receipt was answered,
+authorization remained open, one message was captured locally and one due item
+persisted. No email was delivered and no repair completion was recorded. The
+downloaded HTML was rendered and known-identity checks passed, not proof of full
+anonymization. Evidence:
+`.data/verification/usefulness-app-review-2026-10-22/summary.json`.
+Automation took 7.898 wall seconds / 6.726 summed step seconds; these are not
+human completion times or evidence of time saved.
+
+Inspection of the actual export confirmed two existing clarity gaps: the obsolete
+request is labelled `draft`, not `Stale draft`, and message citations such as
+`[source 1]` must be matched against history entries labelled with UUIDs. These
+remain recommended handover improvements, not newly fixed features.
+
 ### Compact Workspace Refinement: October 21
 
 The header now uses 44px export/update icon commands with accessible names and
@@ -987,6 +1025,9 @@ percentages, cost savings, medical benefits or shorter repairs.
 
 Focus on completing evidence and submission, not adding unrelated features.
 
+- [ ] Label obsolete drafts clearly in exported case packs, not only in the workspace.
+- [ ] Make exported numbered citations directly match readable attributed-history source labels.
+- [ ] Investigate intermittent initial case-loading delays; the October 22 fresh rerun passed, but did not establish a cause or fix.
 - [ ] Verify physical microphone, audible replies and keyboard/screen-reader usability.
 - [x] Remove model waits for supported case reads and redacted HTML history exports; October 19 working-tree verification is recorded above.
 - [ ] Review broader model behavior and slow complex requests; the spot checks do not establish general accuracy or fast inference.

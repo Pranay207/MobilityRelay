@@ -149,14 +149,14 @@ for environment variables, Windows instructions, Gmail testing and Docker.
 
 ## Verification
 
-Latest code verification: **October 21, 2026**, using isolated fictional data on
+Latest code verification: **October 22, 2026**, using isolated fictional data on
 Windows, Node 24.11.0 and installed Microsoft Edge.
 
 | Check | Recorded result |
 | --- | --- |
 | TypeScript and production build | Passed. |
 | Backend | **174 tests passed**, including real HTTP/MCP calls, provenance, approval, reply review and stale-state protection. |
-| Browser workflows | **69/70 passed** in the latest full run; one desktop accessibility check timed out. A fresh run passed all **four** compact-layout/accessibility checks without relaxed assertions or timeouts. |
+| Browser workflows | **69/70 passed** in the latest full run; one desktop test exceeded its initial case-heading wait before reaching reply review. A fresh run passed all **four** stale-preview/full-case checks without relaxed assertions or timeouts. |
 | Accessibility and responsive layout | No automated violations in tested states. Keyboard focus, readable text, 44px header icon controls and desktop/mobile layout checks passed. |
 
 ```sh
