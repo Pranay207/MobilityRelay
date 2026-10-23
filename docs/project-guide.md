@@ -373,6 +373,7 @@ No new cloud/model call, library, seventh MCP tool or automatic message is added
 
 - Whole-request supplier/insurer report queries read the current MCP brief without inference. They quote the latest non-superseded report by occurrence time, with stable source number, source name, channel and UTC date. Long text is explicitly an excerpt. Comparing reports never establishes fault; absent reports are stated as missing. Unsupported local questions no longer receive a generic status answer.
 - Model-assisted operations in both AI modes discover the real MCP catalog. Supported status/next-step/follow-up reads and redacted HTML history exports call real MCP without inference in every mode. Exact whole-request matching keeps compound requests and different formats on their existing bounded path; there is no case-result cache.
+- Exact draft commands such as "Prepare a request to the supplier about missing estimate reference" also use real MCP without inference in every mode. A closed topic list selects current questions; exactly one contact must match the explicit role. Missing/ambiguous matches do not guess a recipient or fall back to model execution. Source-backed wording and exact-message approval are unchanged. More complex wording still follows the bounded model path.
 - Bedrock consent is enforced immediately before the model path. Local commands do not share case text or require cloud consent; a genuine model request without consent still receives 403. The composer lets the server decide rather than disabling all typed requests in Bedrock mode.
 - The host injects the active case, restricts requested operations and resolves short case-scoped contact/question references to real IDs.
 - The model cannot record evidence or send messages. Follow-up tools may create only, not edit or cancel existing items.
@@ -443,6 +444,113 @@ not establish the native toolkit's sub-500 ms query target.
 [Alexa+ quickstart](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-quickstart.html).
 
 ## 4. Testing and Latest Results
+
+### Submission-Day Implementation Audit: October 23
+
+The current scope is a **working hackathon prototype**, not a production-ready
+repair service or a proven real-world intervention. There is no defensible
+single completion percentage across code, validation and submission.
+
+| Area | Current Evidence | Remaining Limit |
+| --- | --- | --- |
+| Tech Implementation | Six real Streamable HTTP MCP tools; persistence, reviewed writes, exact-message approval and exports; production build and 195/195 unit/integration tests pass. | Complex inference remains slow; native Alexa+, Bedrock and SMTP delivery are not live-verified. |
+| Design | 22/22 focused Edge checks pass on desktop/mobile in 3.9 minutes, including five fictional personas, loading recovery, appointment review, microphone feedback and reload protection. | Controlled transcripts are not physical microphone or screen-reader validation. The full browser suite was not completed. |
+| Potential Impact | Sourced coordination problem and a complete fictional case from conflicting reports to reviewed follow-up and export. | No independent user study, measured benefit versus notes/email, or evidence of shorter repairs. |
+| Quality of the Idea | Neutral cross-party records, source-backed questions and receipt-versus-authorization review form a coherent workflow. | Global uniqueness and a competition score are not established. |
+
+**Bug found and fixed:** saving an HTML verification export under `.data`
+caused Vite's development watcher to reload connected workspaces. This could
+discard unsent input and made a saved result screenshot show a loading screen.
+A new browser regression failed before the fix. Private storage, the configured
+data directory and test-report directories are now excluded from file watching;
+the same check passes on desktop and mobile. Demo tests also wait for the case
+and closed export dialog before capturing the result. Production file-serving
+denials and approval rules remain in place.
+
+**Earlier failure retained:** the broader 120-test attempt was stopped after
+44 completed checks: 43 passed and one appointment-review check failed while
+waiting for its dialog to close. Its unchanged desktop/mobile tests passed in
+the subsequent 22-check focused run. The trace showed a pending action request;
+that timeout's root cause is not conclusively established or proved to be the
+watcher bug. No complete 120/122-test pass is claimed. The focused JSON report is
+in ignored `.data/verification/browser-focused-final-2026-10-23.json`.
+
+**Current speed spot check:** ten exact draft commands across five fictional
+personas took **142-498 ms**, with model calls explicitly forbidden. Twenty
+local case reads had a 632 ms first read, 105 ms median and 154 ms p95. These
+small local measurements are not user completion times, production promises
+or a native Alexa latency certification. The separately tested actual model
+path below still took about twenty seconds. Report:
+`.data/verification/performance-direct-drafts-final-2026-10-23.json`.
+
+The core implementation is ready for rehearsal. Finish physical English voice
+checks, private-repo reviewer access, the public video and Devpost fields before
+calling the submission complete. Independent user testing remains recommended,
+not replaced by the five fictional personas. Do not add unrelated features or
+claim optional integrations that were not exercised.
+
+### Reliability and Five Demo Personas: October 22
+
+**Common draft requests no longer wait for Ollama.** Exact commands with an
+explicit supplier/insurer and supported topic read the fresh MCP brief and call
+`prepare_repair_request` directly. Negative, compound, unknown-topic and custom
+instructions do not match this fast path. Multiple recipients open the selection
+form; no matching question/contact means no draft. A failed write is not retried.
+This removes unnecessary inference, not the cost of model generation itself.
+The real model path remains separately tested with wording outside this grammar.
+
+Ten warmed local MCP draft samples, two for each fictional persona, took
+**94-166 ms**, with inference explicitly forbidden and no approval or delivery.
+The accompanying twenty case reads had a 306 ms first read, 73 ms median and
+108 ms p95. These are small developer measurements, not production/native Alexa
+latency guarantees or user completion times. A separate actual `qwen2.5:1.5b`
+tool-selection request passed in **20,084 ms**, leaving an unapproved draft.
+Complex model requests can still be slow. Reproduce the separate checks with:
+
+```sh
+npm run measure:performance -- direct-drafts-check --commands --drafts --expect-direct
+npm run test:ollama -- --draft-only
+npm run test:demo
+```
+
+**Loading recovery:** initial selection reuses the case list already returned
+by the server instead of requesting it again before the MCP brief. It does not
+cache case results. GET reads have a ten-second deadline; a failed initial case
+read shows a recoverable error and **Retry loading case**, not an endless spinner.
+Retry validates the current case list. POST actions receive no automatic read
+deadline or retry; approval/send ambiguity safeguards remain unchanged. Older
+case/generation guards still reject late responses for another case. The earlier
+isolated branding load timeout did not recur in the focused branding checks;
+its original environmental cause was not conclusively established.
+
+**Speech feedback:** an English recognition session ending with no transcript
+now explains that outcome, keeps typed text and allows another recording.
+Dictation still never submits or approves by itself. Tests use controlled browser
+transcripts, not physical audio or a speech-recognition accuracy benchmark.
+
+| Fictional Persona | Scripted Outcome |
+| --- | --- |
+| Maya | Conflicting reports -> unapproved receipt draft -> reviewed receipt answer -> authorization still open -> old approval disabled -> fresh approved local capture -> due item -> redacted HTML history. |
+| Alex | Temporary-equipment request includes only the loaner question; parts remain delayed and both questions unresolved. |
+| Sam | Follow-up asks for a named responder; it does not invent a supplier response. |
+| Jordan | Request asks for a written refusal reason/review process, not an insurance decision or legal appeal. |
+| Ravi | Request asks for qualified assessment/alternative arrangements, not mechanical instructions. |
+
+All five journeys passed on desktop and mobile: **ten scripted runs, not ten
+human participants**. Original reports remain quoted, approval starts unchecked,
+exports retain unresolved issues, and no email or completed repair is claimed.
+Only Maya's explicit approval captures a message locally. Fixtures are isolated
+and deleted after each test. Screenshots, actual exported histories and labelled
+machine-readable results are in ignored
+`.data/verification/demo-users-2026-10-22/`. Automated task timings exclude human
+reading/decision time and do not prove real-world usefulness or savings.
+
+`npm run check` passed the production build and **195 unit/integration tests**.
+The focused Edge run passed **18/18 checks in 2.1 minutes**, covering the ten
+persona runs, safe loading retries/timeouts, branding and empty speech feedback.
+No real SMTP, AWS, native Alexa+, physical audio or independent-user benefit is
+established by these tests. Both previews retain their fictional databases and
+capture-only configuration after restart.
 
 ### Compact Layout Pass: October 22
 
@@ -1328,6 +1436,36 @@ percentages, cost savings, medical benefits or shorter repairs.
 
 Focus on completing evidence and submission, not adding unrelated features.
 
+### Final Submission Order: October 23
+
+The deadline is **October 23, 12:00 pm PDT**, equivalent to **October 24,
+12:30 am IST**. Aim to submit at least one hour earlier, leaving time to fix
+missing fields or inaccessible links. [Official rules](https://amazonappdev2026.devpost.com/rules).
+
+1. Finish the final build/tests and push the verified source. Freeze features;
+   fix only a reproduced submission-blocking defect.
+2. Rehearse Maya's fictional case and physically check English dictation and
+   playback. If speech fails, use the honest text/form fallback, not a staged
+   recording presented as live recognition.
+3. Check private-repo access for all five Amazon reviewers and the Devpost
+   reviewer specified in the FAQ. Re-send expired invitations through GitHub;
+   do not assume an old invitation is still valid.
+4. Record the existing 2:45 script below. Show source disagreement, real MCP
+   traces, reviewed receipt, authorization still open, invalidated old draft,
+   fresh approval, local capture and exported history. Upload the English video
+   publicly to YouTube or Vimeo and test its link while signed out.
+5. Complete the Devpost description, Alexa+ track selection, setup/testing
+   instructions, screenshots, product feedback and optional friction log.
+   Claim neither live Bedrock nor SMTP delivery. Only select a mini-challenge
+   when its separate requirements have actually been met.
+6. Submit and verify the submitted state, repository URL and playable video.
+   Do not leave the entry as a saved draft until the final minutes.
+
+Public hosting is **optional**, and partner-only Alexa+ tooling is not required
+for our own simulator. Do not spend the remaining submission window attempting
+a new deployment or cloud migration. Five scripted personas are test fixtures,
+not independent user feedback. [Official FAQ](https://amazonappdev2026.devpost.com/details/faqs).
+
 - [x] Restore the selected case on reload, with validation and a safe fallback (October 22).
 - [x] Make the missing-contact prerequisite actionable from Overview and Requests instead of silently disabling request preparation.
 - [x] Add a primary first-update action to the empty case Overview and Evidence views.
@@ -1337,6 +1475,10 @@ Focus on completing evidence and submission, not adding unrelated features.
 - [ ] Verify physical microphone, audible replies and keyboard/screen-reader usability.
 - [x] Ground supported supplier/insurer read questions in dated MCP sources; make unsupported local questions explicit and contain speech-service/playback failures (October 22). Physical verification is still required for hardware claims.
 - [x] Remove model waits for supported case reads and redacted HTML history exports; October 19 working-tree verification is recorded above.
+- [x] Remove inference waits for supported exact recipient/topic draft requests; separately test the actual model path and preserve approval (October 22).
+- [x] Bound failed case reads, provide safe retry and remove the duplicate initial case-list request (October 22).
+- [x] Complete five fictional-persona workflows on desktop/mobile, preserving the distinction from human usability evidence (October 22).
+- [x] Reproduce and prevent private verification exports from reloading the development workspace or discarding unsent text; desktop/mobile regressions pass (October 23).
 - [ ] Review broader model behavior and slow complex requests; the spot checks do not establish general accuracy or fast inference.
 - [ ] Recommended, not compulsory: complete an unfamiliar person's fictional task; record failures and feedback.
 - [x] Complete a scripted fictional UI task, record timings/clarity risks and inspect the actual export (October 21). This does not replace the unfamiliar-person check.
@@ -1377,7 +1519,7 @@ evidence map, not a winning probability or promise of full marks.
 | --- | --- |
 | 0:00-0:15 | Open Maya's labelled fictional case. "MobilityRelay is a simulated Alexa+ repair assistant with a real MCP server. The supplier reports sending an estimate; the insurer reports not locating it." |
 | 0:15-0:35 | Ask/type "Compare the supplier and insurer reports" in Relay. Show its real MCP trace, dated source numbers and both quotations; open Evidence for the full text. "We don't decide who's at fault. We ask what information is missing." |
-| 0:35-0:55 | Prepare an initial receipt request using the question's control. Show real `prepare_repair_request` trace and exact source-backed wording. Leave it unapproved. |
+| 0:35-0:55 | Ask/type "Prepare a request to the supplier about missing estimate reference". Show real `prepare_repair_request` trace and source-backed wording. Explain that this exact command uses deterministic MCP routing, not inference. Leave it unapproved. |
 | 0:55-1:20 | Say/type "The insurer replied: We received the estimate. Reference AB-47. Authorization is still pending." Label this a fictional reply. Confirm source/date, add the reply reference and open Preview changes. No evidence is saved yet. |
 | 1:20-1:40 | Show the exact receipt quotation. Select the receipt answer and explicitly confirm. "Received is not approved. Authorization is still unanswered." Show the real `record_repair_event` trace and persistent What changed summary. |
 | 1:40-2:00 | Open the old request: approval is disabled. Prepare a fresh draft from current questions; show authorization included and receipt excluded. Nothing is sent automatically. |
@@ -1447,6 +1589,8 @@ positives, friction and whether we would use the tool again.
 | Oct 15: Ollama/qwen2.5:1.5b | A live run missed the reminder write and generated an unsupported authorization prediction. These are model/application integration observations, not a proven Ollama-runtime defect. | Trusted short-command routing and structured case-read rendering; suggest small-model examples that test actual writes and unsupported factual claims, not just HTTP success. | `tests/agent.test.ts`, `scripts/verify-ollama.ts`; seven-scenario rerun passed with fictional data. |
 | Oct 19: application command routing | The host waited for model interpretation before returning a structured case brief or standard HTML export: 47.9/39.9 seconds in local API probes. This was application overhead, not a demonstrated MCP/Ollama defect. | Route exact supported commands through real MCP without inference; retain inference for draft selection and ambiguous requests. Suggest documenting separate tool, model and browser timings. | `scripts/verify-performance.ts`, `tests/agent.test.ts`, `tests/http.test.ts`; same API probes now 158/224 ms, with local spot-check limits above. |
 | Oct 20: application reply review / React / Playwright | Inspection found that the old stale-draft button reused old question IDs/body. A 320px screenshot also showed the preview retaining an offscreen title. New exact-label test selectors failed on populated nested controls; this was test code, not a proven vendor defect. | Fresh drafts now select current questions, preview resets scroll without stealing focus, and tests use accessible roles/names. Suggest testing before/after review, rejected saves and narrow-screen transitions together. | `server/replies.ts`, `tests/replies.test.ts`, `tests/reply-review.spec.ts`; fictional cases only, no delivered mail or independent user feedback. |
+| Oct 22: application routing, loading and browser speech | Common draft selection still waited for a model despite an explicit role/topic. Failed reads could leave a loading spinner; an empty speech session could end silently. These are application observations, not proven MCP/Ollama/browser defects. | Strict direct MCP draft commands, bounded read-only loading with retry, no-transcript feedback and five fictional-persona workflows. Keep complex-model latency, physical audio and independent usefulness claims separate. | `tests/demo-users.spec.ts`, `tests/api.test.ts`, `tests/agent.test.ts`, `tests/qa.spec.ts`; labelled scripted results, no human testimonials. |
+| Oct 23: application Vite watch configuration | Saving private verification HTML triggered development page reloads and could discard unsent input. A controlled browser regression reproduced it. | Exclude private data and generated test reports from file watching; keep private-file serving denied. Suggest testing generated exports with unsent input present. | Regression fails before the fix and passes on desktop/mobile afterward; final focused run 22/22, not a completed full-suite claim. |
 | Pending: Bedrock | No real account/model-enabled run observed. | Record access, tool use, latency/cost only after a controlled live test. No live AWS qualification claimed. | Optional `server/agent.ts` adapter, not live evidence. |
 | Pending: SMTP provider | No real provider delivery test observed. | Keep capture labels; record TLS setup, acceptance/error and receipt separately after testing. | No provider feedback claimed yet. |
 

@@ -91,6 +91,7 @@ English speech input and spoken replies are optional; text and forms remain
 available. Dictation shows live words, keeps listening across speech segments,
 and requires a separate send action. Manual editing cancels recording. Browser
 speech-service and microphone accuracy still need physical verification.
+An empty recording now gives recoverable feedback and preserves typed text.
 Relay can read the latest supplier or insurer report, or compare
 both with dated source numbers. Corrected records are excluded and long reports
 are labelled as excerpts. Optional report playback gives the source, date and
@@ -151,6 +152,18 @@ Try **"What did the supplier say?"** or **"Compare the supplier and insurer
 reports"** for attributed evidence, without a model wait. These are reported
 statements, not a verdict on responsibility or a prediction of approval.
 
+**"Prepare a request to the supplier about missing estimate reference"** prepares
+a reviewed draft through real MCP without an inference wait, even with Ollama
+or Bedrock configured. Supported whole-request commands require one matching
+recipient and current open questions; ambiguous recipients open the selection
+form. Nothing is approved or sent by voice. Other AI requests can still take
+tens of seconds, and Bedrock model requests still require consent.
+
+Workspace reads have a timeout and a retry action instead of an endless loading
+state. Retrying reloads the case list; it never repeats a message or other write.
+Private data and verification exports are excluded from development file watching
+so saving an HTML history there does not reload the workspace or discard input.
+
 <details>
 <summary>Optional local AI with Ollama</summary>
 
@@ -172,19 +185,20 @@ for environment variables, Windows instructions, Gmail testing and Docker.
 
 ## Verification
 
-Latest code verification: **October 22, 2026**, using isolated fictional data on
+Latest code verification: **October 23, 2026**, using isolated fictional data on
 Windows, Node 24.11.0 and installed Microsoft Edge.
 
 | Check | Recorded result |
 | --- | --- |
 | TypeScript and production build | Passed. |
-| Backend | **188 tests passed**, including real HTTP/MCP calls, recipient-facing wording, separate spoken report text, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
-| Browser workflows | **Both desktop/mobile density checks passed** across six viewport sizes each, including 320x700: conversation space, visible actions/input, 16px reading text, 44px targets and axe checks. The broader regression rerun was stopped at the user's request for speed; historical results and remaining limits are recorded in the guide. |
+| Unit and integration | **195 tests passed**, including real HTTP/MCP calls, direct drafts, bounded reads, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
+| Browser workflows | **22 focused desktop/mobile checks passed**, including five fictional-persona journeys, private-export reload protection, loading recovery, appointment review, branding and empty speech feedback. This is not a completed full-suite run; the earlier timeout and verification limits are recorded in the guide. |
 | Accessibility and responsive layout | No automated violations in tested states. Keyboard focus, readable text, 44px header icon controls and desktop/mobile layout checks passed. |
 
 ```sh
 npm run check
 npm run test:browser
+npm run test:demo
 npm run measure:usefulness
 ```
 
@@ -193,6 +207,12 @@ callbacks, not physical audio. The measurement script exercises a fictional
 case through reviewed follow-up, local capture and export; its timings are not
 human completion times or proof of repair-time savings. Automated checks do not
 establish full accessibility conformance or general model accuracy.
+
+The demo suite covers Maya's paperwork conflict, Alex's loaner request, Sam's
+unanswered request, Jordan's coverage clarification and Ravi's assessment.
+Maya's full flow verifies receipt answered, authorization still open, stale
+approval blocked, a fresh reviewed follow-up and an exported history. These
+are scripted fictional personas, not recruited users or evidence of time saved.
 
 A real Ollama/MCP fictional-case walkthrough completed on October 22, before
 these UI fixes. The latest changes have not had a fresh clean-install or
