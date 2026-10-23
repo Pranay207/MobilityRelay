@@ -19,16 +19,13 @@ MobilityRelay helps wheelchair users and caregivers turn scattered repair
 updates into a dated case history, clear next questions and reviewed follow-ups.
 It preserves what each party reported without deciding who is right.
 
-The name combines **Mobility**, reflecting wheelchair users and independence,
-with **Relay**, reflecting the exchange of updates between users, caregivers,
-suppliers and insurers. It describes coordination, not a repair service.
-
 Built for the **Alexa+ track** of the Amazon Developer Hackathon: an independent
 voice/text **Alexa+ experience simulator**, backed by a real self-hosted MCP
-server over **Streamable HTTP**. Native Alexa+ integration is not claimed.
+server over **Streamable HTTP**.
 
 [Overview](#the-problem) | [Quick Start](#quick-start) |
 [MCP Integration](#mcp-integration) | [Verification](#verification) |
+[Demo Script](docs/project-guide.md#6-demo-script-target-245) |
 [Project Guide](docs/project-guide.md)
 
 ## Product Preview
@@ -46,9 +43,8 @@ Repair workspace and Relay conversation:
   <img src="assets/relay-mobile.png" alt="Mobile Alexa+ experience simulator showing a completed case brief with a real MCP call" width="260">
 </p>
 
-Actual application captures using fictional records and the local command
-simulator. Mobile views use a 390x844 browser-emulated viewport, not a physical
-device. These are not native Alexa+ or live supplier integrations.
+Actual application captures with fictional records and the local command
+simulator. Mobile screenshots use a 390x844 browser-emulated viewport.
 
 ## The Problem
 
@@ -70,119 +66,40 @@ app or a population estimate for all wheelchair users.
 
 ## How It Works
 
-1. **Record:** add attributed, dated updates. Corrections preserve the original source.
-2. **Clarify:** see the next unanswered question, with supporting evidence available on demand.
-3. **Prepare:** create a source-backed request without sending it.
-4. **Approve:** review the exact recipient and message before authorizing an attempt. The default mode captures messages locally, not by email.
-5. **Review replies:** inspect quotations and a before/after preview, then explicitly select and confirm answers. Receipt can be answered while authorization remains pending; outdated drafts require a fresh request.
-6. **Follow up and export:** save local due items and download an attributed HTML/JSON history, with optional known-identity redaction. Exports identify stale drafts and use readable source numbers; HTML source links lead to the corresponding history entries.
+1. **Record:** add dated updates attributed to their sources; corrections preserve the original.
+2. **Clarify:** see the next unanswered question and the evidence behind it.
+3. **Prepare:** draft a source-backed request without sending it.
+4. **Approve:** review the exact recipient and message; the default outbox captures it locally.
+5. **Review replies:** inspect the proposed changes and explicitly confirm answers. Received does not mean approved; changed evidence invalidates outdated drafts.
+6. **Follow up and export:** save local due items and download a source-linked HTML/JSON history, with optional known-identity redaction.
 
-The selected case survives reload in the same browser tab. New cases show a
-**Record first update** action; a missing recipient contact has a direct
-**Add contact** action beside the blocked request workflow.
-The compact desktop layout gives more space to the conversation, with a narrower
-sidebar and less header padding. Main reading text remains 16px and primary
-controls retain 44px targets. Narrow screens use a labelled evidence icon.
-New drafts ask the recipient direct questions rather than copying workspace
-instructions. Reviewed answers use readable source numbers linked to Evidence;
-technical record IDs remain available under **Record details**.
-
-English speech input and spoken replies are optional; text and forms remain
-available. Dictation shows live words, keeps listening across speech segments,
-and requires a separate send action. Manual editing cancels recording. Browser
-speech-service and microphone accuracy still need physical verification.
-An empty recording now gives recoverable feedback and preserves typed text.
-Enabling spoken replies reads the latest assistant reply, then new replies;
-muting stops playback. Browser-reported playback shows **Speaking...**, and a
-silent startup produces a retryable error. The creator confirmed hearing a reply
-after this fix; microphone accuracy and broader audio/accessibility are unverified.
-Report reads tolerate inserted periods between known command words. Supported
-ambiguous comparisons offer an explicit **Compare reports** confirmation rather
-than silently changing a misheard word; the original transcript stays in history.
-Relay can read the latest supplier or insurer report, or compare
-both with dated source numbers. Corrected records are excluded and long reports
-are labelled as excerpts. Optional report playback gives the source, date and
-user-recorded situation with an uncertainty warning, rather than reading the
-long quotations aloud. Written quotations remain in the conversation and full
-reports in Evidence. Unsupported local questions receive an explicit
-limitation instead of an unrelated summary. Reply recognition is deliberately narrow: supported insurer receipt
-statements and supplier appointment confirmations with an explicit date, time
-and UTC offset. Ambiguous wording remains evidence only. No connected inbox or
-independent verification is claimed.
-
-**Conversational continuity:** after **"Compare the reports"**, say
-**"Ask the supplier for that reference."** Relay uses the persisted, current-case
-question to prepare a review-only draft. Missing, changed or ambiguous context
-opens recipient/question selection instead of guessing. Specific questions such
-as **"What is blocking authorization?"** receive source-backed explanations.
-In AI mode, other read wording is interpreted into a validated view; the host
-renders recorded facts rather than displaying unrestricted model claims.
-
-## MCP Integration
-
-```text
-React workspace -> Express host -> MCP SDK client over HTTP
-                -> /mcp server -> validated repair tools -> SQLite
-```
-
-The host initializes the MCP connection, discovers tools and calls them through
-Streamable HTTP. Tool results appear in the conversation trace. Wire tests cover
-protocol **`2025-11-25`**; this is not a UI-only simulation of tool calls.
-
-| Tool | Responsibility |
-| --- | --- |
-| `record_repair_event` | Save reviewed evidence and explicitly selected, source-backed reply answers. |
-| `get_repair_brief` | Read the history, unanswered questions and next steps. |
-| `prepare_repair_request` | Prepare a request without sending it. |
-| `send_approved_request` | Attempt only the exact message with valid user approval. |
-| `manage_repair_followup` | Maintain a persistent local follow-up item. |
-| `export_repair_packet` | Export an attributed HTML or JSON case history. |
-
-**User review remains the authority.** AI cannot independently record evidence
-or send messages through the simulator. Approval is bound to the reviewed
-message; changed case information can invalidate a draft.
-
-**Stack:** TypeScript, React, Vite, Lucide, Express, SQLite, the official MCP SDK
-and Zod. Optional adapters support Ollama, Amazon Bedrock and SMTP. Local mode is
-a limited command interpreter, not an LLM.
+English dictation and spoken replies are optional. Users can always type or use
+the reviewed forms; recording speech never submits it automatically.
 
 ## Quick Start
 
-Requires **Node.js 24+ and npm**. The default local mode needs no AWS account,
-API key or email credentials.
+Requires **Node.js 24+ and npm**. In a local checkout:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open **http://127.0.0.1:4317**. An empty database is seeded with five labelled
-fictional cases. Local records persist in ignored `.data/mobilityrelay.sqlite`.
+Open **http://127.0.0.1:4317**. The default mode needs no AWS account, API key or
+email credentials. An empty database receives five labelled fictional cases;
+records persist in ignored `.data/mobilityrelay.sqlite`.
 
 Start with **Power chair repair**: inspect the receipt question, prepare a
-request, review its sources and export the history. In Relay, **Case brief**
-reads the case through MCP.
+request, review its sources and export the history. Try this in Relay:
 
-Try **"What did the supplier say?"** or **"Compare the supplier and insurer
-reports"** for attributed evidence, without a model wait. These are reported
-statements, not a verdict on responsibility or a prediction of approval.
-**"Compare the reports"** and **"What did each side say?"** also work.
+> Compare the reports.
+>
+> Ask the supplier for that reference.
 
-**"Prepare a request to the supplier about missing estimate reference"** prepares
-a reviewed draft through real MCP without an inference wait, even with Ollama
-or Bedrock configured. Supported whole-request commands require one matching
-recipient and current open questions; ambiguous recipients open the selection
-form. Nothing is approved or sent by voice. Other AI requests can still take
-tens of seconds, and Bedrock model requests still require consent.
-
-Workspace reads have a timeout and a retry action instead of an endless loading
-state. A transient GET connection failure retries once within the original
-ten-second budget; HTTP errors, cancellations and writes are not automatically
-retried. Failed startup offers **Retry loading workspace** instead of showing an
-apparently empty case list. Recovery never repeats a login or message. Read-only
-review proposals open without a redundant case refresh; saving still needs review.
-Private data and verification exports are excluded from development file watching
-so saving an HTML history there does not reload the workspace or discard input.
+The first request reads attributed evidence through MCP. The second prepares a
+review-only draft using the current conversation context. Ambiguous or stale
+context opens a selection form instead of guessing. Nothing is approved or sent
+by voice. **Case brief** offers a button-based starting point.
 
 <details>
 <summary>Optional local AI with Ollama</summary>
@@ -195,17 +112,41 @@ npm run dev:ollama
 ```
 
 Open **http://127.0.0.1:4318**. This uses a separate fictional database and local
-message capture. Read interpretation uses schema-constrained selections, with
-answers rendered from current MCP records. In one warmed local run, three
-interpreted questions took 0.8-1.0 seconds each; a separate model-selected draft
-review took 8.5 seconds. These are small development checks, not latency or
-general accuracy guarantees. Other CPU inference can take tens of seconds.
-Model weights are downloaded separately.
+message capture. The model interprets read requests into validated views; the
+host renders facts from current MCP records. Model weights download separately.
 
 </details>
 
-See the [setup and configuration guide](docs/project-guide.md#2-run-the-project)
-for environment variables, Windows instructions, Gmail testing and Docker.
+See the [setup guide](docs/project-guide.md#2-run-the-project) for configuration,
+Windows instructions, Gmail testing and Docker.
+
+## MCP Integration
+
+```text
+React workspace -> Express host -> MCP SDK client over HTTP
+                -> /mcp server -> validated repair tools -> SQLite
+```
+
+The host initializes an MCP connection, discovers tools and calls them over
+Streamable HTTP using the official SDK. Conversation traces expose actual tool
+results. Wire tests cover protocol **`2025-11-25`**.
+
+| Tool | Responsibility |
+| --- | --- |
+| `record_repair_event` | Save reviewed evidence and explicitly selected, source-backed reply answers. |
+| `get_repair_brief` | Read the history, unanswered questions and next steps. |
+| `prepare_repair_request` | Prepare a request without sending it. |
+| `send_approved_request` | Attempt only the exact message with valid user approval. |
+| `manage_repair_followup` | Maintain a persistent local follow-up item. |
+| `export_repair_packet` | Export an attributed HTML or JSON case history. |
+
+**User review remains the authority.** AI cannot independently save evidence or
+send messages through the simulator. Approval is bound to the exact message and
+case version; writes are never automatically replayed after a connection failure.
+
+**Stack:** TypeScript, React, Vite, Lucide, Express, SQLite, the official MCP SDK
+and Zod. Optional adapters support Ollama, Amazon Bedrock and SMTP. Local mode is
+a limited command interpreter, not an LLM.
 
 ## Verification
 
@@ -215,49 +156,33 @@ Windows, Node 24.11.0 and installed Microsoft Edge.
 | Check | Recorded result |
 | --- | --- |
 | TypeScript and production build | Passed. |
-| Unit and integration | **231 tests passed**, including real HTTP/MCP, bounded read recovery, no write replay, context isolation, approval, reply review, exports and UTC-offset chronology. Test files run sequentially; explicit concurrency checks remain covered. |
-| Browser workflows | **142/142 passed in 15.5 minutes** on the final reliability code, across desktop and mobile, with no failures, skips or whole-test retries. Read-only API fixtures may retry one connection reset; assertions and test timeouts are unchanged. Earlier failed attempts and the fixes remain in the guide. |
-| Actual local AI | A seven-step fictional API journey passed with three real Ollama read-interpretation calls, a contextual MCP draft and redacted export. A separate real-model desktop draft review and mobile persisted conversation passed. These are not seven model calls or a general accuracy study. |
-| Accessibility and responsive layout | No automated violations in tested states. Keyboard focus, readable text, 44px header icon controls and desktop/mobile layout checks passed. |
-| Production container | The `c5696d6` baseline passed a fresh Linux image build, clean `npm ci`, non-root/auth/MCP/approval checks and restart persistence. The latest client recovery changes have not had a fresh image test; the full Ollama/HTTPS Compose stack remains untested. |
-| Dependency audit | Patched the transitive `ip-address` advisory to 10.7.4. Production and full npm audits reported **zero known advisories** at check time; this is not a complete security assessment. |
+| Unit and integration | **231 passed**, including real HTTP/MCP, persistence, approval boundaries, reviewed replies, recovery and UTC-offset chronology. |
+| Browser workflows | **142/142 passed in 15.5 minutes**, desktop/mobile, with no failures, skips or whole-test retries. Read-only requests may retry one connection reset. |
+| Actual local AI | Seven-step fictional API journey passed, including three real Ollama inference calls. Separate desktop draft review and mobile persisted-conversation checks passed. |
+| Accessibility and layout | Keyboard focus and responsive checks passed; no automated accessibility violations in tested states. |
+| Production container | Earlier `c5696d6` Linux image passed clean build, non-root/auth/MCP/approval checks and restart persistence. Latest client changes have not had a fresh image test. |
+| Dependency audit | Production and full npm audits reported **zero known advisories** at check time; this is not a security certification. |
 
 ```sh
 npm run check
 npm run test:browser
-npm run test:demo
-npm run measure:usefulness
 # Optional, requires running Ollama and its downloaded local model:
 npm run test:conversation
 ```
 
-Browser tests require installed Microsoft Edge. Speech tests use simulated
-callbacks, not physical audio. The measurement script exercises a fictional
-case through reviewed follow-up, local capture and export; its timings are not
-human completion times or proof of repair-time savings. Automated checks do not
-establish full accessibility conformance or general model accuracy.
-
-The demo suite covers Maya's paperwork conflict, Alex's loaner request, Sam's
-unanswered request, Jordan's coverage clarification and Ravi's assessment.
-Maya's full flow verifies receipt answered, authorization still open, stale
-approval blocked, a fresh reviewed follow-up and an exported history. These
-are scripted fictional personas, not recruited users or evidence of time saved.
-
-A real Ollama/MCP API journey was rerun after the chronology fix. Its first
-interpreted answer took 13.9 seconds end to end; the next two took 1.6-1.8
-seconds. These development timings do not guarantee responsiveness. The earlier
-production-container baseline passed its fresh build and smoke test; the latest
-client patch has not had a new image test. A fresh host checkout and the complete
-Ollama/HTTPS Compose stack have not been verified. Detailed
-results, historical measurements and remaining work are in the
+Browser tests require installed Microsoft Edge. The fictional workflows cover
+paperwork, temporary equipment, unanswered requests, coverage and assessment.
+Full results, latency measurements, earlier failed attempts and fixes are in the
 [QA section of the project guide](docs/project-guide.md#4-testing-and-latest-results).
 
-## Scope and Privacy
+## Current Status and Privacy
 
-- **Coordination, not repair:** the app cannot supply parts, diagnose faults, approve insurance, force a response or guarantee a faster repair.
-- **Capture, not delivery:** default messages stay in a local outbox. SMTP and Bedrock adapters are implemented but not live-verified. Follow-ups are local due items, not autonomous messages or background reminders.
-- **Prototype, not a clinical system:** this is a shared workspace with plaintext SQLite storage. Use fictional data. Browser speech may use a vendor service, and export redaction is limited and needs review.
-- **Explicit access limits:** native Alexa+, physical microphone accuracy, broad speaker/device compatibility and public hosting remain unverified. The creator's successful playback report is not independent user-benefit validation.
+- **Alexa+ simulator:** real MCP, but no native Alexa+ integration, connected inbox or live supplier/insurer systems.
+- **Local capture:** approved messages stay in the local outbox by default. SMTP and Bedrock adapters are not live-verified; follow-ups are local due items, not autonomous messages or background reminders.
+- **Optional AI:** local mode is a limited command interpreter. Ollama is tested on small fictional scenarios, not general accuracy; CPU inference can take tens of seconds. The full Ollama/HTTPS Compose stack and a fresh host checkout remain unverified.
+- **Fictional data only:** the shared prototype stores plaintext SQLite records. Browser speech may use a vendor service; export redaction is limited and needs review before sharing.
+- **Validation limits:** speech tests use controlled callbacks, not physical audio. Microphone accuracy, broad device support, public hosting, full accessibility conformance and independent user benefit are unverified.
+- **Coordination, not repair:** no diagnosis, coverage decisions, guaranteed response or evidence of shorter repairs. The app cannot supply missing parts or technicians.
 
 ## Repository Guide
 
