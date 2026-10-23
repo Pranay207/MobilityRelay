@@ -30,7 +30,7 @@ async function mockVoiceLifecycle(page: Page) {
     Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: TestRecognition });
     Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
       cancel() { state.speaking = false; },
-      speak(utterance: SpeechSynthesisUtterance) { state.spoken.push(utterance.text); state.spokenLanguages.push(utterance.lang); state.speaking = true; },
+      speak(utterance: SpeechSynthesisUtterance) { state.spoken.push(utterance.text); state.spokenLanguages.push(utterance.lang); state.speaking = true; utterance.onstart?.({} as SpeechSynthesisEvent); },
     } });
     Object.assign(window, { voiceLifecycle: state });
   });
@@ -193,21 +193,24 @@ test('failed spoken output leaves a readable reply and ignores old playback erro
   if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
   await page.getByRole('button', { name: 'Enable spoken responses', exact: true }).click();
   await page.getByRole('button', { name: 'Case brief', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => (window as unknown as { testUtterances: unknown[] }).testUtterances.length)).toBe(1);
-  await page.evaluate(() => {
-    const utterance = (window as unknown as { testUtterances: SpeechSynthesisUtterance[] }).testUtterances[0];
+  await expect(page.getByRole('button', { name: 'Case brief', exact: true })).toBeEnabled();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { testUtterances: unknown[] }).testUtterances.length)).toBeGreaterThan(0);
+  const failedIndex = await page.evaluate(() => (window as unknown as { testUtterances: unknown[] }).testUtterances.length - 1);
+  await page.evaluate(index => {
+    const utterance = (window as unknown as { testUtterances: SpeechSynthesisUtterance[] }).testUtterances[index];
     utterance.onerror?.({ error: 'audio-busy' } as SpeechSynthesisErrorEvent);
-  });
+  }, failedIndex);
   await expect(page.getByRole('alert').filter({ hasText: 'Spoken response could not play.' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Enable spoken responses', exact: true })).toBeVisible();
   await expect(page.getByRole('log').locator('.message-assistant').last()).toContainText('user-maintained record');
   await page.getByRole('button', { name: 'Enable spoken responses', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { testUtterances: unknown[] }).testUtterances.length)).toBe(failedIndex + 2);
   await page.getByRole('button', { name: 'Case brief', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => (window as unknown as { testUtterances: unknown[] }).testUtterances.length)).toBe(2);
-  await page.evaluate(() => {
-    const utterance = (window as unknown as { testUtterances: SpeechSynthesisUtterance[] }).testUtterances[0];
+  await expect.poll(() => page.evaluate(() => (window as unknown as { testUtterances: unknown[] }).testUtterances.length)).toBe(failedIndex + 3);
+  await page.evaluate(index => {
+    const utterance = (window as unknown as { testUtterances: SpeechSynthesisUtterance[] }).testUtterances[index];
     utterance.onerror?.({ error: 'network' } as SpeechSynthesisErrorEvent);
-  });
+  }, failedIndex);
   await expect(page.getByRole('button', { name: 'Mute spoken responses', exact: true })).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
@@ -227,7 +230,7 @@ test('speech startup failures are contained and missing output is disabled', asy
   expect(pageErrors).toEqual([]);
 });
 
-test('slow initial history cannot be mistaken for a new spoken reply', async ({ page }, info) => {
+test('slow initial history stays silent until explicit spoken-response opt-in', async ({ page }, info) => {
   await mockVoiceLifecycle(page);
   let release!: () => void; let initial = true;
   const gate = new Promise<void>(resolve => { release = resolve; });
@@ -245,11 +248,13 @@ test('slow initial history cannot be mistaken for a new spoken reply', async ({ 
     await expect(page.getByRole('button', { name: 'Enable spoken responses', exact: true })).toHaveCount(0);
     release();
     await expect(page.getByRole('log')).toContainText('Historical reply must stay silent.');
-    await page.getByRole('button', { name: 'Enable spoken responses', exact: true }).click();
     expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken)).toEqual([]);
-    await page.getByRole('button', { name: 'Case brief', exact: true }).click();
+    await page.getByRole('button', { name: 'Enable spoken responses', exact: true }).click();
     await expect.poll(() => page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken.length)).toBe(1);
-    expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken[0])).not.toContain('Historical reply must stay silent.');
+    expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken[0])).toBe('Historical reply must stay silent.');
+    await page.getByRole('button', { name: 'Case brief', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken.length)).toBe(2);
+    expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken[1])).not.toContain('Historical reply must stay silent.');
   } finally { release(); }
 });
 
@@ -277,26 +282,51 @@ test('voice callbacks from an interrupted request cannot change a new recording'
   await expect(page.getByRole('button', { name: 'Start voice input', exact: true })).toBeVisible();
 });
 
-test('spoken replies are opt-in for new responses and stop at review boundaries', async ({ page }, info) => {
+test('spoken replies replay the latest response on opt-in and stop at review boundaries', async ({ page }, info) => {
   await mockVoiceLifecycle(page);
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
   if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay' }).click();
   await page.getByRole('button', { name: 'Case brief', exact: true }).click();
   await expect(page.getByRole('log').getByText(/This is a user-maintained record/).last()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Case brief', exact: true })).toBeEnabled();
-  await page.getByRole('button', { name: 'Enable spoken responses', exact: true }).click();
   expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken)).toEqual([]);
+  await page.getByRole('button', { name: 'Enable spoken responses', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken.length)).toBe(1);
+  await expect(page.getByRole('status').filter({ hasText: 'Speaking...' })).toBeVisible();
   await page.getByRole('button', { name: 'Case brief', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Case brief', exact: true })).toBeEnabled();
-  await expect.poll(() => page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken.length)).toBe(1);
-  expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spokenLanguages: string[] } }).voiceLifecycle.spokenLanguages)).toEqual(['en-IN']);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken.length)).toBe(2);
+  expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spokenLanguages: string[] } }).voiceLifecycle.spokenLanguages)).toEqual(['en-IN', 'en-IN']);
   if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
   await page.getByRole('button', { name: 'Record update', exact: true }).first().click();
   await expect(page.getByRole('dialog', { name: 'Record an update', exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { speaking: boolean } }).voiceLifecycle.speaking)).toBe(false);
   await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
   if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay' }).click();
-  expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken.length)).toBe(1);
+  expect(await page.evaluate(() => (window as unknown as { voiceLifecycle: { spoken: string[] } }).voiceLifecycle.spoken.length)).toBe(2);
+});
+
+test('paused spoken output resumes and silent startup gives a retryable error without case writes', async ({ page }, info) => {
+  await page.addInitScript(() => {
+    const state = { resumed: 0, paused: true, speaking: false, spoken: [] as SpeechSynthesisUtterance[] };
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
+      get paused() { return state.paused; }, resume() { state.resumed++; state.paused = false; },
+      cancel() { state.speaking = false; }, speak(utterance: SpeechSynthesisUtterance) { state.spoken.push(utterance); },
+    } });
+    Object.assign(window, { silentSpeech: state });
+  });
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+  await page.getByRole('button', { name: 'Case brief', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Case brief', exact: true })).toBeEnabled();
+  let writes = 0; page.on('request', request => { if (request.method() !== 'GET') writes++; });
+  await page.getByRole('button', { name: 'Enable spoken responses', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { silentSpeech: { resumed: number } }).silentSpeech.resumed)).toBe(1);
+  await expect(page.getByRole('status').filter({ hasText: 'Speaking...' })).toHaveCount(0);
+  await expect(page.getByRole('alert').filter({ hasText: 'Spoken response did not start.' }).first()).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('button', { name: 'Enable spoken responses', exact: true })).toBeEnabled();
+  await expect(page.getByRole('log').locator('.message-assistant').last()).toContainText('user-maintained record');
+  expect(writes).toBe(0);
 });
 
 test('review dialogs stop the microphone and discard queued transcripts', async ({ page }, info) => {
