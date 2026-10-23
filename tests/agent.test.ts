@@ -138,7 +138,7 @@ test('missing reports and long quotations are explicit, not invented answers', a
     const reply = await s.local('Read the latest supplier report');
     assert.match(reply.reply, /\[excerpt\]/); assert.match(reply.reply, /Read the full records/); assert.ok(reply.reply.length < 600);
     assert.match(reply.spokenText!, /Reported situation: Other update/); assert.ok(reply.spokenText!.length < 300);
-    assert.match((await s.local('Will my insurer approve coverage?')).reply, /cannot answer that specific question/);
+    assert.match((await s.local('Will my insurer approve coverage?')).reply, /cannot predict approval/);
     assert.equal(s.store.brief(s.c.id).drafts.length, 0);
   } finally { s.store.close(); }
 });

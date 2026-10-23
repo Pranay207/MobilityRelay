@@ -27,6 +27,11 @@ export function questionCommand(input: string): string[] | null {
   return null;
 }
 
+export function futureOutcomeQuestion(input: string) {
+  const text = commandText(input);
+  return /^(?:will|when (?:will|can)|predict|guarantee)\b/i.test(text) && /\b(?:approv\w*|authoriz\w*|coverage|repair|complete\w*|finish\w*|arriv\w*|respond\w*|reply)\b/i.test(text);
+}
+
 export function contextualDraftCommand(input: string): { role: 'supplier' | 'insurer'; reference: boolean } | null {
   const text = commandText(input).replace(/[.!?]+$/, '').trim().replace(/\s+/g, ' ');
   const reference = /^ask (?:the |my )?(supplier|insurer) for that (?:(?:receipt|submission|estimate) )?reference$/i.exec(text);

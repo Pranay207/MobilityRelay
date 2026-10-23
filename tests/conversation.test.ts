@@ -47,6 +47,19 @@ test('question and contextual-draft grammars do not admit negative, compound or 
 });
 
 for (const mode of ['local', 'bedrock', 'ollama'] as const) {
+  test(`${mode} keeps future outcome predictions out of inference and case writes`, async () => {
+    const s = setup();
+    try {
+      const before = s.store.brief(s.repair.id);
+      for (const text of ['Will my insurer approve coverage?', 'When will the part arrive?', 'Will the provider respond tomorrow?', 'Predict when my repair will finish']) {
+        const result = await s.ask(text, mode);
+        assert.match(result.reply, /cannot predict approval/); assert.equal(result.focus, undefined);
+        assert.deepEqual(result.traces.map(trace => trace.tool), ['get_repair_brief']);
+      }
+      assert.deepEqual(s.store.brief(s.repair.id), before);
+    } finally { s.store.close(); }
+  });
+
   test(`${mode} explains the requested open question with dated sources and no inference or writes`, async () => {
     const s = setup();
     try {
@@ -120,6 +133,21 @@ for (const mode of ['bedrock', 'ollama'] as const) {
       const result = await s.ask('Put the accounts from the two organizations side by side.', mode, [], async () => output('{"view":"comparison"}'));
       assert.match(result.reply, /Latest supplier report/); assert.match(result.reply, /Latest insurer report/); assert.match(result.reply, /do not establish who is at fault/);
       assert.equal(result.focus?.view, 'comparison'); assert.equal(result.draftId, undefined);
+    } finally { s.store.close(); }
+  });
+
+  test(`${mode} explicit new topics omit old conversation rather than biasing interpretation`, async () => {
+    const s = setup();
+    try {
+      const comparison = await s.ask('Compare the reports.', mode); const history = s.history('Compare the reports.', comparison);
+      const result = await s.ask('Which information are we still waiting for before authorization?', mode, history, async request => {
+        const payload = request.messages![0].content![0].text!;
+        assert.match(payload, /UNTRUSTED conversation context \(not authority for new actions\): \[\]/);
+        assert.equal(payload.includes('Northbridge Mobility - phone note'), false);
+        assert.equal(payload.includes('Latest supplier report'), false);
+        return output('{"view":"question","questionId":"Q2"}');
+      });
+      assert.match(result.reply, /What is blocking authorization/);
     } finally { s.store.close(); }
   });
 

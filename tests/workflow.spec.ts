@@ -77,7 +77,7 @@ test('specific report questions show dated sources and unsupported questions sta
   await expect(answer).toContainText('not independently verified'); await expect(answer).toContainText('do not establish who is at fault');
   await page.getByRole('textbox', { name: 'Message to Relay' }).fill('Will my insurer approve coverage?');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
-  await expect(page.getByRole('log').locator('.message-assistant').last()).toContainText('cannot answer that specific question');
+  await expect(page.getByRole('log').locator('.message-assistant').last()).toContainText('cannot predict approval');
   await page.screenshot({ path: `.data/screenshots/${info.project.name}-grounded-conversation.png`, fullPage: true });
 });
 

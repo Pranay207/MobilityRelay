@@ -17,6 +17,7 @@
     "test:demo": "playwright test tests/demo-users.spec.ts",
     "test:ollama": "tsx scripts/verify-ollama.ts",
     "test:ollama:ui": "tsx scripts/verify-ollama-ui.ts",
+    "test:conversation": "tsx scripts/verify-conversation.ts",
     "test:container": "tsx scripts/verify-container.ts",
     "measure:usefulness": "tsx scripts/measure-usefulness.ts",
     "measure:performance": "tsx scripts/verify-performance.ts",
