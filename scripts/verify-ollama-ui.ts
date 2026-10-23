@@ -36,7 +36,7 @@ try {
     await expect(desktop.getByRole('button', { name: command, exact: true })).toBeEnabled();
   }
   const completion = desktop.waitForResponse(response => response.url().endsWith('/api/agent') && response.request().method() === 'POST', { timeout: 180000 });
-  await desktop.getByRole('textbox', { name: 'Message to Relay' }).fill('Prepare a request to the supplier asking for the missing estimate reference.');
+  await desktop.getByRole('textbox', { name: 'Message to Relay' }).fill('Prepare a detailed request to the supplier asking for the missing estimate reference.');
   const started = performance.now(); await desktop.getByRole('button', { name: 'Send message', exact: true }).click();
   const response = await completion; assert.equal(response.ok(), true);
   assert.ok(modelCalls > 0, 'Draft selection must still exercise real local inference.');

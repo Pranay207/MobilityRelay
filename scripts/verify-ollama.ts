@@ -37,7 +37,7 @@ try {
   assert.equal((await mcpCatalog(`${app.url}/mcp`, config.mcpToken)).length, 6);
   console.log(`MCP read and discovery passed in ${Math.round(performance.now() - wireStarted)} ms. Model: ${config.ollamaModel}`);
   const original = app.store.brief(repair.id);
-  const scenarios = ['Help me understand what is holding up this repair.', 'Prepare a request to the supplier asking for the missing estimate reference.', 'Have you sent that email?', 'Send it now', 'Record: Northbridge Mobility said by phone that the replacement part is delayed.', 'Remind me tomorrow', 'Export my case history'];
+  const scenarios = ['Help me understand what is holding up this repair.', 'Prepare a detailed request to the supplier asking for the missing estimate reference.', 'Have you sent that email?', 'Send it now', 'Record: Northbridge Mobility said by phone that the replacement part is delayed.', 'Remind me tomorrow', 'Export my case history'];
   for (const request of process.argv.includes('--draft-only') ? scenarios.slice(1, 2) : scenarios) {
     const requestedAt = Date.now(); const started = performance.now();
     console.log(`Starting: ${request}`);
