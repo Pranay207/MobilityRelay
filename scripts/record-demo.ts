@@ -78,6 +78,7 @@ try {
     await expect(page.getByRole('dialog', { name: 'Review request', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Approve & capture locally', exact: true })).toBeDisabled();
     await expect(page.getByRole('dialog')).toContainText('Was the paperwork received?');
+    await page.getByRole('button', { name: 'Approve & capture locally', exact: true }).scrollIntoViewIfNeeded();
   });
   const inputReply = async (page: Page) => {
     await page.getByRole('button', { name: 'Review reply', exact: true }).click();
@@ -87,6 +88,7 @@ try {
     await page.getByRole('textbox', { name: 'Reply text', exact: true }).pressSequentially('We received the estimate. Reference AB-47. Authorization is still pending.', { delay: 35 });
     await page.getByRole('button', { name: 'Preview changes', exact: true }).click();
     await expect(page.locator('.reply-answer blockquote')).toHaveText('We received the estimate.');
+    await page.getByRole('button', { name: 'Record reviewed reply', exact: true }).scrollIntoViewIfNeeded();
   };
   await record('review', noop, async page => {
     await inputReply(page);
@@ -99,6 +101,7 @@ try {
     await page.getByRole('checkbox', { name: 'I reviewed the source and selected answers.', exact: true }).check();
     await page.getByRole('button', { name: 'Record reviewed reply', exact: true }).click();
     await expect(page.getByRole('region', { name: 'What changed', exact: true })).toContainText('What is blocking authorization?');
+    await page.getByRole('region', { name: 'What changed', exact: true }).scrollIntoViewIfNeeded();
     const brief = app.store.brief(repair.id);
     assert.ok(brief.questions.find(q => q.kind === 'receipt')?.resolved);
     assert.equal(brief.questions.find(q => q.kind === 'approval')?.resolved, false);
@@ -108,7 +111,8 @@ try {
   }, async page => {
     await page.getByRole('button', { name: /Repair DEMO-1042: clarification requested/ }).click();
     await expect(page.getByRole('checkbox', { name: 'I approve this recipient and exact message.', exact: true })).toBeDisabled();
-    await page.waitForTimeout(3000);
+    await page.getByRole('checkbox', { name: 'I approve this recipient and exact message.', exact: true }).scrollIntoViewIfNeeded();
+    await page.waitForTimeout(6000);
     await page.getByRole('button', { name: 'Prepare fresh draft', exact: true }).click();
     await expect(page.getByRole('checkbox', { name: /Was the paperwork received/ })).toHaveCount(0);
     await page.getByRole('button', { name: 'Prepare draft', exact: true }).click();
@@ -122,6 +126,7 @@ try {
     await page.getByRole('button', { name: /Repair DEMO-1042: clarification requested/ }).filter({ hasText: 'draft' }).first().click();
   }, async page => {
     await expect(page.getByRole('dialog')).toContainText('Local capture only. No email will be delivered.');
+    await page.getByRole('button', { name: 'Approve & capture locally', exact: true }).scrollIntoViewIfNeeded();
     await page.waitForTimeout(2500);
     await page.getByRole('checkbox', { name: 'I approve this recipient and exact message.', exact: true }).check();
     await page.getByRole('button', { name: 'Approve & capture locally', exact: true }).click();

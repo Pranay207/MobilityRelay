@@ -8,6 +8,8 @@ import { chromium } from '@playwright/test';
 const directory = resolve(process.argv[2] || '.data/demo-video-2026-10-23');
 const ffmpeg = resolve(process.env.FFMPEG_PATH || '.data/demo-tools/node_modules/ffmpeg-static/ffmpeg.exe');
 const story = JSON.parse(await readFile('scripts/demo-story.json', 'utf8'));
+const selectedScenes = process.argv.find(value => value.startsWith('--scenes='))?.slice('--scenes='.length).split(',');
+if (selectedScenes) assert.ok(selectedScenes.every(id => story.scenes.some(scene => scene.id === id)), 'Unknown scene selected for editing');
 const capture = JSON.parse(await readFile(join(directory, 'capture.json'), 'utf8'));
 assert.equal(capture.completed, true, 'Capture must finish its real-workflow assertions before editing');
 const encoded = join(directory, 'encoded'); await mkdir(encoded, { recursive: true });
@@ -34,9 +36,17 @@ const browser = await chromium.launch({ channel: 'msedge' });
 try {
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
   const base = '<style>*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#0e1915;color:#fff;letter-spacing:0}img{display:block}h1,p{margin:0}</style>';
-  await page.setContent(`${base}<main style="padding:100px 120px"><div style="display:flex;gap:28px;align-items:center"><img src="${logo}" width="88" height="88" alt="MobilityRelay"><strong style="font-size:46px">MobilityRelay</strong></div><p style="margin-top:112px;color:#a9dfcb;font-size:26px">WHEELCHAIR REPAIR COORDINATION</p><h1 style="margin-top:26px;font-size:82px;line-height:1.16">When repair updates conflict,<br>know what to ask next.</h1><p style="margin-top:48px;font-size:32px;color:#d6e4dd">Alexa+ experience simulator. Real MCP. User-reviewed actions.</p><p style="margin-top:140px;font-size:22px;color:#b4c9be">FICTIONAL WALKTHROUGH / TYPED CONVERSATION / COMPUTER-GENERATED NARRATION</p></main>`);
+  await page.setContent(`${base}<main style="padding:100px 120px">
+    <div style="display:flex;gap:28px;align-items:center"><img src="${logo}" width="88" height="88" alt="MobilityRelay"><strong style="font-size:46px">MobilityRelay</strong></div>
+    <p style="margin-top:112px;color:#a9dfcb;font-size:26px">WHEELCHAIR REPAIR COORDINATION</p>
+    <h1 style="margin-top:26px;font-size:82px;line-height:1.16">When repair updates conflict,<br>know what to ask next.</h1>
+    <p style="margin-top:48px;font-size:32px;color:#d6e4dd">Alexa+ experience simulator. Real MCP. User-reviewed actions.</p>
+    <p style="margin-top:48px;font-size:24px;line-height:1.5;color:#d6e4dd">In a survey of 301 wheelchair users with spinal cord injury,<br>vendor noncompletion after contact was the most common reason for incomplete repairs.</p>
+    <p style="margin-top:12px;font-size:20px;color:#b4c9be">Worobey et al., 2025 / doi:10.1016/j.apmr.2024.10.001 / Problem evidence, not app-effectiveness evidence.</p>
+    <p style="margin-top:42px;font-size:20px;color:#b4c9be">FICTIONAL WALKTHROUGH / TYPED CONVERSATION / COMPUTER-GENERATED NARRATION</p>
+  </main>`);
   await page.screenshot({ path: join(directory, 'intro.png') });
-  await page.setContent(`${base}<main style="padding:86px 120px"><div style="display:flex;gap:24px;align-items:center"><img src="${logo}" width="72" height="72" alt="MobilityRelay"><strong style="font-size:40px">MobilityRelay</strong></div><p style="margin-top:86px;font-size:26px;color:#a9dfcb">THE DISTINCTION THAT MATTERS</p><h1 style="margin-top:28px;font-size:86px">Received is not approved.</h1><p style="margin-top:38px;font-size:36px;line-height:1.5">Six real MCP tools.<br>Source-backed records. Exact-message approval.<br>A history the user can review and hand over.</p><p style="margin-top:62px;font-size:25px;color:#c4d9cd">React / Express / MCP 2025-11-25 / Streamable HTTP / SQLite / Ollama</p><p style="margin-top:58px;font-size:21px;line-height:1.6;color:#b4c9be">Real application footage with edited pauses. Computer-generated English narration.<br>Fictional records; local capture, not email delivery. No physical microphone test.<br>No claim of guaranteed approval, faster repairs or independent user-benefit validation.</p></main>`);
+  await page.setContent(`${base}<main style="padding:86px 120px"><div style="display:flex;gap:24px;align-items:center"><img src="${logo}" width="72" height="72" alt="MobilityRelay"><strong style="font-size:40px">MobilityRelay</strong></div><p style="margin-top:86px;font-size:26px;color:#a9dfcb">THE DISTINCTION THAT MATTERS</p><h1 style="margin-top:28px;font-size:86px">Received is not approved.</h1><p style="margin-top:38px;font-size:36px;line-height:1.5">Six real MCP tools.<br>Source-backed records. Exact-message approval.<br>A history the user can review and hand over.</p><p style="margin-top:62px;font-size:25px;color:#c4d9cd">React / Express / MCP 2025-11-25 / Streamable HTTP / SQLite / Ollama</p><p style="margin-top:58px;font-size:21px;line-height:1.6;color:#b4c9be">Real application footage with edited pauses. Computer-generated English narration.<br>Fictional case. Local message capture. Source-linked history export.</p></main>`);
   await page.screenshot({ path: join(directory, 'close.png') });
   await page.setViewportSize({ width: 1920, height: 60 });
   for (const scene of story.scenes.filter(s => !['intro', 'close'].includes(s.id))) {
@@ -67,9 +77,14 @@ for (const scene of story.scenes) {
     ? '[0:v]fps=30,scale=1920:960:flags=lanczos,pad=1920:1080:0:60:color=0x0e1915,tpad=stop_mode=clone:stop_duration=180[footage];[footage][2:v]overlay=0:0,format=yuv420p[v]'
     : '[0:v]fps=30,format=yuv420p[v]';
   args.push('-filter_complex', `${video};[1:a]adelay=400:all=1,apad,loudnorm=I=-16:TP=-1.5:LRA=11[a]`, '-map', '[v]', '-map', '[a]', '-t', duration.toFixed(3), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-threads', '2', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2', '-movflags', '+faststart', target);
-  console.log(`Encoding ${scene.id}: ${duration.toFixed(2)} seconds (${audioSeconds.toFixed(2)} narrated)`);
-  run(ffmpeg, args);
-  const words = scene.narration.split(/\s+/); let count = 0;
+  if (!selectedScenes || selectedScenes.includes(scene.id)) {
+    console.log(`Encoding ${scene.id}: ${duration.toFixed(2)} seconds (${audioSeconds.toFixed(2)} narrated)`);
+    run(ffmpeg, args);
+  } else {
+    assert.ok((await stat(target)).size > 0, `Missing encoded scene ${scene.id}; run a complete render first`);
+    console.log(`Reusing verified ${scene.id}`);
+  }
+  const words = scene.narration.replaceAll('M C P', 'MCP').replaceAll('Alexa plus', 'Alexa+').split(/\s+/); let count = 0;
   while (count < words.length) {
     const chunk = words.slice(count, count + 11);
     const start = offset + 0.4 + audioSeconds * count / words.length;
@@ -101,6 +116,6 @@ try {
   media = await page.locator('video').evaluate(video => ({ duration: video.duration, width: video.videoWidth, height: video.videoHeight }));
   assert.equal(media.width, 1920); assert.equal(media.height, 1080); assert.ok(media.duration < 180);
 } finally { await inspector.close(); }
-const output = { file: final, bytes: (await stat(final)).size, ...media, voice: story.voice, narration: 'Computer-generated English narration', captionTiming: 'Narration-derived phrase timings; human review recommended', timeline, fictional: true, actualMcpTools: [...new Set(capture.traces.filter(t => t.ok).map(t => t.tool))], modelCalls: capture.inferenceCalls, input: capture.evidence.input, email: capture.evidence.email, editing: 'Real browser footage; startup pauses trimmed; final frames held when needed; no action footage sped up', decodeCheck: 'Passed complete FFmpeg decode', uploaded: false };
+const output = { file: final, bytes: (await stat(final)).size, ...media, voice: story.voice, narration: 'Computer-generated English narration', captionTiming: 'Narration-derived phrase timings; human review recommended', timeline, fictional: true, actualMcpTools: [...new Set(capture.traces.filter(t => t.ok).map(t => t.tool))], modelCalls: capture.inferenceCalls, input: capture.evidence.input, email: capture.evidence.email, editing: 'Real browser footage; startup pauses trimmed; final frames held when needed; no action footage sped up', researchContext: { source: 'https://experts.umn.edu/en/publications/wheelchair-repairs-delays-causes-and-associated-outcomes/', doi: '10.1016/j.apmr.2024.10.001', scope: '301 wheelchair users with spinal cord injury; problem context, not app effectiveness' }, decodeCheck: 'Passed complete FFmpeg decode', uploaded: false };
 await writeFile(join(directory, 'video-report.json'), JSON.stringify(output, null, 2));
 console.log(JSON.stringify(output, null, 2));
