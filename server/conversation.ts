@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { AgentReply, Brief, ChatMessage, ConversationFocus } from '../shared/types.js';
 import { stageLabels } from '../shared/types.js';
+import { compareInstants, utcDate } from '../shared/time.js';
 
 const readViews = ['supplier', 'insurer', 'comparison', 'next_step', 'followups', 'question', 'limits', 'clarify'] as const;
 export const readSelectionJsonSchema = { oneOf: [
@@ -39,7 +40,7 @@ export function readReply(brief: Brief, selection: ReadSelection): ReadReply {
         .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || Date.parse(b.recordedAt) - Date.parse(a.recordedAt))[0];
       if (!latest) return { id: '', written: `No current ${party} report is recorded in this case.`, spoken: `No current ${party} report is recorded in this case.` };
       const source = brief.events.findIndex(event => event.id === latest.id) + 1;
-      const date = new Date(latest.occurredAt).toISOString().slice(0, 10);
+      const date = utcDate(latest.occurredAt);
       const excerpt = latest.text.length > 280 ? `${latest.text.slice(0, 280)}... [excerpt]` : latest.text;
       return {
         id: latest.id,
@@ -59,7 +60,7 @@ export function readReply(brief: Brief, selection: ReadSelection): ReadReply {
     focus: focus(brief, 'next_step', open[0]?.id),
   };
   if (selection.view === 'followups') {
-    const scheduled = brief.followups.filter(item => item.status === 'scheduled').sort((a, b) => a.dueAt.localeCompare(b.dueAt));
+    const scheduled = brief.followups.filter(item => item.status === 'scheduled').sort((a, b) => compareInstants(a.dueAt, b.dueAt));
     return {
       reply: scheduled.length ? `${scheduled.length} scheduled follow-up${scheduled.length === 1 ? '' : 's'}. Next: ${scheduled[0].title}, ${new Date(scheduled[0].dueAt).toLocaleString('en-IN', { timeZone: scheduled[0].timezone })} (${scheduled[0].timezone}). No new reminder was created.` : 'There are no scheduled follow-ups in this case. No new reminder was created.',
       focus: focus(brief, 'followups'),
@@ -70,7 +71,7 @@ export function readReply(brief: Brief, selection: ReadSelection): ReadReply {
     if (question) {
       const sources = question.sourceIds.flatMap(id => {
         const index = brief.events.findIndex(event => event.id === id);
-        return index < 0 ? [] : [`Source ${index + 1}, ${brief.events[index].occurredAt.slice(0, 10)} UTC`];
+        return index < 0 ? [] : [`Source ${index + 1}, ${utcDate(brief.events[index].occurredAt)} UTC`];
       });
       const explanation = question.explanation.length > 500 ? `${question.explanation.slice(0, 500)}...` : question.explanation;
       return {

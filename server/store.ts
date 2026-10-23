@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Brief, ChatMessage, Contact, Draft, Question, RepairCase, RepairEvent } from '../shared/types.js';
 import { stageLabels } from '../shared/types.js';
+import { compareInstants } from '../shared/time.js';
 
 export const now = () => new Date().toISOString();
 export const hash = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -100,7 +101,7 @@ export class Store {
   activeEvents(caseId: string): RepairEvent[] {
     const all = this.list<RepairEvent>('event', caseId);
     const superseded = new Set(all.map(event => event.supersedesId));
-    return all.filter(event => !superseded.has(event.id)).sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.recordedAt.localeCompare(b.recordedAt));
+    return all.filter(event => !superseded.has(event.id)).sort((a, b) => compareInstants(a.occurredAt, b.occurredAt) || compareInstants(a.recordedAt, b.recordedAt));
   }
   syncQuestions(caseId: string) {
     const events = this.activeEvents(caseId);
