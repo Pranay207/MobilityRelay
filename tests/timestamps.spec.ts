@@ -2,10 +2,10 @@ import { test, expect } from '@playwright/test';
 import type { AgentReply, Brief, RepairCase } from '../shared/types';
 
 test('MCP offset timestamps agree across stage, evidence order, next follow-up and conversation after reload', async ({ page }, info) => {
-  const session = await (await page.request.get('/api/session')).json(); const headers = { 'x-relay-csrf': session.csrf };
+  const session = await (await page.request.get('/api/session', { maxRetries: 1 })).json(); const headers = { 'x-relay-csrf': session.csrf };
   const created = await page.request.post('/api/cases', { headers, data: { title: `Fictional offset QA ${info.project.name}`, person: 'Fictional tester', equipment: 'Chair', reference: 'OFFSET-BROWSER-QA', category: 'Time zones', fictional: true } });
   expect(created.ok()).toBe(true); const repair: RepairCase = await created.json();
-  const brief = async (): Promise<Brief> => (await (await page.request.get(`/api/cases/${repair.id}`)).json()).data;
+  const brief = async (): Promise<Brief> => (await (await page.request.get(`/api/cases/${repair.id}`, { maxRetries: 1 })).json()).data;
   const action = async (tool: string, args: unknown) => { const response = await page.request.post('/api/action', { headers, data: { tool, args } }); expect(response.ok()).toBe(true); return (await response.json()).data; };
   try {
     await action('record_repair_event', { caseId: repair.id, requestId: crypto.randomUUID(), party: 'insurer', source: 'Fictional earlier approval', channel: 'Email', text: 'Earlier approval report.', stage: 'authorization_approved', occurredAt: '2026-01-02T00:30:00+05:30' });

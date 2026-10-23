@@ -11,14 +11,14 @@ async function choose(page: Page, title: string) {
   await expect(heading(page, title)).toBeVisible();
 }
 async function session(page: Page) {
-  const data = await (await page.request.get('/api/session')).json();
+  const data = await (await page.request.get('/api/session', { maxRetries: 1 })).json();
   return { 'x-relay-csrf': data.csrf };
 }
 
 test('reload restores the selected case without loading the default case first', async ({ page }) => {
   await page.goto('/'); await expect(heading(page, 'Power chair repair')).toBeVisible();
   await choose(page, 'Replacement caster delay');
-  const cases: RepairCase[] = await (await page.request.get('/api/cases')).json();
+  const cases: RepairCase[] = await (await page.request.get('/api/cases', { maxRetries: 1 })).json();
   const selected = cases.find(c => c.reference === 'DEMO-2081')!;
   await expect.poll(() => page.evaluate(key => sessionStorage.getItem(key), selectionKey)).toBe(selected.id);
   const caseReads: string[] = [];
@@ -55,7 +55,7 @@ test('a deleted selected case falls back without requesting its missing details'
     expect(reads.includes(`/api/cases/${repair.id}`)).toBe(false);
     expect(await page.evaluate(key => sessionStorage.getItem(key), selectionKey)).not.toBe(repair.id);
   } finally {
-    const cases: RepairCase[] = await (await page.request.get('/api/cases')).json();
+    const cases: RepairCase[] = await (await page.request.get('/api/cases', { maxRetries: 1 })).json();
     if (cases.some(c => c.id === repair.id)) await page.request.delete(`/api/cases/${repair.id}`, { headers, data: { confirm: repair.title } });
   }
 });
@@ -135,13 +135,13 @@ test('a new case exposes first update and contact setup before a reviewed draft'
     await expect(review.getByRole('button', { name: 'Approve & capture locally', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
     await page.reload(); await expect(heading(page, title)).toBeVisible();
-    const cases: RepairCase[] = await (await page.request.get('/api/cases')).json();
+    const cases: RepairCase[] = await (await page.request.get('/api/cases', { maxRetries: 1 })).json();
     const repair = cases.find(c => c.title === title)!;
-    const brief = (await (await page.request.get(`/api/cases/${repair.id}`)).json()).data;
+    const brief = (await (await page.request.get(`/api/cases/${repair.id}`, { maxRetries: 1 })).json()).data;
     expect(brief.events).toHaveLength(1); expect(brief.contacts).toHaveLength(1);
     expect(brief.drafts).toHaveLength(1); expect(brief.drafts[0].status).toBe('draft');
   } finally {
-    const cases: RepairCase[] = await (await page.request.get('/api/cases')).json();
+    const cases: RepairCase[] = await (await page.request.get('/api/cases', { maxRetries: 1 })).json();
     const repair = cases.find(c => c.title === title && c.fictional);
     if (repair) expect((await page.request.delete(`/api/cases/${repair.id}`, { headers, data: { confirm: title } })).ok()).toBe(true);
   }

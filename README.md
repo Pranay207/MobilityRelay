@@ -176,7 +176,11 @@ form. Nothing is approved or sent by voice. Other AI requests can still take
 tens of seconds, and Bedrock model requests still require consent.
 
 Workspace reads have a timeout and a retry action instead of an endless loading
-state. Retrying reloads the case list; it never repeats a message or other write.
+state. A transient GET connection failure retries once within the original
+ten-second budget; HTTP errors, cancellations and writes are not automatically
+retried. Failed startup offers **Retry loading workspace** instead of showing an
+apparently empty case list. Recovery never repeats a login or message. Read-only
+review proposals open without a redundant case refresh; saving still needs review.
 Private data and verification exports are excluded from development file watching
 so saving an HTML history there does not reload the workspace or discard input.
 
@@ -211,11 +215,11 @@ Windows, Node 24.11.0 and installed Microsoft Edge.
 | Check | Recorded result |
 | --- | --- |
 | TypeScript and production build | Passed. |
-| Unit and integration | **227 tests passed**, including real HTTP/MCP, grounded reads, context isolation, approval, reply review, export integrity and UTC-offset chronology. Test files run sequentially; explicit concurrency checks remain covered. |
-| Browser workflows | Latest complete run: **123/130 passed**, with seven timing/refresh failures. After QA resource cleanup, **14/14 focused desktop/mobile checks passed**, including every failed journey. No assertions or timeouts were relaxed. A new clean 130-check run is still pending; the earlier 128/128 pass and failed attempts remain in the guide. |
+| Unit and integration | **231 tests passed**, including real HTTP/MCP, bounded read recovery, no write replay, context isolation, approval, reply review, exports and UTC-offset chronology. Test files run sequentially; explicit concurrency checks remain covered. |
+| Browser workflows | The latest pre-fix complete run passed **127/130**. Startup, review and post-login focused checks passed during the reliability fixes; the complete **142-check post-fix run is pending**. Read-only API fixtures may retry one connection reset; assertions and test timeouts are unchanged. Earlier attempts remain in the guide. |
 | Actual local AI | A seven-step fictional API journey passed with three real Ollama read-interpretation calls, a contextual MCP draft and redacted export. A separate real-model desktop draft review and mobile persisted conversation passed. These are not seven model calls or a general accuracy study. |
 | Accessibility and responsive layout | No automated violations in tested states. Keyboard focus, readable text, 44px header icon controls and desktop/mobile layout checks passed. |
-| Production container | A fresh Linux image and clean `npm ci` passed. Isolated checks verified non-root execution, authentication, real MCP, approval blocking, private-file exclusions and persistence after restart. The full Ollama/HTTPS Compose stack remains untested. |
+| Production container | The `c5696d6` baseline passed a fresh Linux image build, clean `npm ci`, non-root/auth/MCP/approval checks and restart persistence. The latest client recovery changes have not had a fresh image test; the full Ollama/HTTPS Compose stack remains untested. |
 | Dependency audit | Patched the transitive `ip-address` advisory to 10.7.4. Production and full npm audits reported **zero known advisories** at check time; this is not a complete security assessment. |
 
 ```sh
@@ -241,9 +245,10 @@ are scripted fictional personas, not recruited users or evidence of time saved.
 
 A real Ollama/MCP API journey was rerun after the chronology fix. Its first
 interpreted answer took 13.9 seconds end to end; the next two took 1.6-1.8
-seconds. These development timings do not guarantee responsiveness. A fresh
-production-container build and smoke test passed; a fresh host checkout and
-the complete Ollama/HTTPS Compose stack have not been verified. Detailed
+seconds. These development timings do not guarantee responsiveness. The earlier
+production-container baseline passed its fresh build and smoke test; the latest
+client patch has not had a new image test. A fresh host checkout and the complete
+Ollama/HTTPS Compose stack have not been verified. Detailed
 results, historical measurements and remaining work are in the
 [QA section of the project guide](docs/project-guide.md#4-testing-and-latest-results).
 

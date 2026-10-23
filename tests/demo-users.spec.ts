@@ -26,13 +26,13 @@ const scenarios: { name: string; task: string; topic: string; role: 'supplier' |
 
 for (const scenario of scenarios) test(`fictional ${scenario.name}: ${scenario.task}`, async ({ page }, info) => {
   if (scenario.name === 'Maya') test.setTimeout(60000);
-  const session = await (await page.request.get('/api/session')).json(); const headers = { 'x-relay-csrf': session.csrf };
+  const session = await (await page.request.get('/api/session', { maxRetries: 1 })).json(); const headers = { 'x-relay-csrf': session.csrf };
   const title = `Fictional ${scenario.name} - ${scenario.task}`;
   const created = await page.request.post('/api/cases', { headers, data: { title, person: `Fictional ${scenario.name}`, equipment: ['Alex', 'Jordan'].includes(scenario.name) ? 'Manual wheelchair' : 'Power wheelchair', reference: `DEMO-USER-${scenario.name.toUpperCase()}`, category: scenario.task, fictional: true } });
   expect(created.ok()).toBe(true); const repair: RepairCase = await created.json();
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   const directory = `.data/verification/demo-users-2026-10-22/${info.project.name}-${scenario.name.toLowerCase()}`;
-  const brief = async (): Promise<Brief> => (await (await page.request.get(`/api/cases/${repair.id}`)).json()).data;
+  const brief = async (): Promise<Brief> => (await (await page.request.get(`/api/cases/${repair.id}`, { maxRetries: 1 })).json()).data;
   const contacts: Contact[] = [];
   try {
     await mkdir(directory, { recursive: true });

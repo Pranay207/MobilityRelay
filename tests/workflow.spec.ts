@@ -86,9 +86,9 @@ test('misheard comparison preserves the transcript and requires an explicit read
   await mockSpeech(page, { transcript });
   let submitted = 0; let caseWrites = 0;
   page.on('request', request => { const path = new URL(request.url()).pathname; if (request.method() === 'POST' && path === '/api/agent') submitted++; if (request.method() === 'POST' && (path === '/api/action' || path.endsWith('/send'))) caseWrites++; });
-  await page.request.get('/api/session');
-  const cases = await (await page.request.get('/api/cases')).json(); const repair = cases.find((item: { reference: string }) => item.reference === 'DEMO-1042');
-  const before = (await (await page.request.get(`/api/cases/${repair.id}`)).json()).data;
+  await page.request.get('/api/session', { maxRetries: 1 });
+  const cases = await (await page.request.get('/api/cases', { maxRetries: 1 })).json(); const repair = cases.find((item: { reference: string }) => item.reference === 'DEMO-1042');
+  const before = (await (await page.request.get(`/api/cases/${repair.id}`, { maxRetries: 1 })).json()).data;
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
   if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
   await page.getByRole('button', { name: 'Start voice input', exact: true }).click();
@@ -99,7 +99,7 @@ test('misheard comparison preserves the transcript and requires an explicit read
   const answer = page.getByRole('log').locator('.message-assistant').last();
   await expect(answer).toContainText('Did you mean the supplier and insurer reports?');
   await expect(answer).not.toContainText('Latest supplier report'); expect(submitted).toBe(1);
-  expect((await (await page.request.get(`/api/cases/${repair.id}`)).json()).data).toEqual(before);
+  expect((await (await page.request.get(`/api/cases/${repair.id}`, { maxRetries: 1 })).json()).data).toEqual(before);
   await page.reload(); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
   if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
   await expect(page.getByRole('log').locator('.message-user').last()).toContainText(transcript);
@@ -112,13 +112,13 @@ test('misheard comparison preserves the transcript and requires an explicit read
   expect(comparison.suggestedCommand).toBeUndefined(); expect(comparison.traces.map((trace: { tool: string }) => trace.tool)).toEqual(['get_repair_brief']);
   await expect(page.getByRole('log').locator('.message-assistant').last()).toContainText('Latest supplier report, Source');
   await expect(page.getByRole('log').locator('.message-assistant').last()).toContainText('Latest insurer report, Source');
-  expect((await (await page.request.get(`/api/cases/${repair.id}`)).json()).data).toEqual(before);
+  expect((await (await page.request.get(`/api/cases/${repair.id}`, { maxRetries: 1 })).json()).data).toEqual(before);
   expect(submitted).toBe(2); expect(caseWrites).toBe(0);
 });
 
 test('report playback uses short attributed situations while written quotations and MCP history remain', async ({ page }, info) => {
   await mockVoiceLifecycle(page);
-  const session = await (await page.request.get('/api/session')).json(); const headers = { 'x-relay-csrf': session.csrf };
+  const session = await (await page.request.get('/api/session', { maxRetries: 1 })).json(); const headers = { 'x-relay-csrf': session.csrf };
   const created = await page.request.post('/api/cases', { headers, data: { title: `Fictional playback ${info.project.name}`, person: 'Fictional Speaker', equipment: 'Power chair', reference: 'VOICE-TEST', category: 'Paperwork', fictional: true } });
   expect(created.ok()).toBe(true); const repair = await created.json();
   try {
@@ -351,7 +351,7 @@ test('review dialogs stop the microphone and discard queued transcripts', async 
 
 test('a delayed chat response cannot overwrite another case conversation', async ({ page }, info) => {
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
-  const cases: { id: string; title: string; reference: string }[] = await (await page.request.get('/api/cases')).json();
+  const cases: { id: string; title: string; reference: string }[] = await (await page.request.get('/api/cases', { maxRetries: 1 })).json();
   const previous = cases.find(c => c.reference === 'DEMO-2081')!;
   const current = cases.find(c => c.reference === 'DEMO-4015')!;
   let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
@@ -381,7 +381,7 @@ for (const activity of ['chat reply', 'follow-up save'] as const) {
   test(`a delayed background refresh cannot undo a newer ${activity}`, async ({ page }, info) => {
     test.setTimeout(60000);
     await page.clock.install();
-    const session = await (await page.request.get('/api/session')).json(); const headers = { 'x-relay-csrf': session.csrf };
+    const session = await (await page.request.get('/api/session', { maxRetries: 1 })).json(); const headers = { 'x-relay-csrf': session.csrf };
     const title = `Refresh test ${activity} ${info.project.name} ${Date.now()}`;
     const created = await page.request.post('/api/cases', { headers, data: { title, person: 'Fictional refresh tester', equipment: 'Chair', reference: '', category: 'Other', fictional: true } });
     expect(created.ok()).toBe(true); const repair = await created.json();
@@ -462,7 +462,7 @@ test('Ollama provider label fits the workspace and does not request Bedrock cons
 test('paired reports use corrected evidence and disappear when the question is answered', async ({ page }, info) => {
   test.setTimeout(60000);
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
-  const session = await (await page.request.get('/api/session')).json(); const headers = { 'x-relay-csrf': session.csrf };
+  const session = await (await page.request.get('/api/session', { maxRetries: 1 })).json(); const headers = { 'x-relay-csrf': session.csrf };
   const title = `Report provenance test ${info.project.name} ${Date.now()}`;
   const created = await page.request.post('/api/cases', { headers, data: { title, person: 'Fictional test user', equipment: 'Test chair', reference: '', category: 'Paperwork clarification', fictional: true } });
   expect(created.ok()).toBe(true); const c = await created.json();
@@ -539,8 +539,8 @@ test('new case runs evidence, draft, approval, follow-up, answer, export and del
   await page.getByRole('button', { name: 'Export history', exact: true }).click(); const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download history' }).click(); expect((await download).suggestedFilename()).toBe('repair-history.html');
   await page.getByRole('button', { name: 'Delete case', exact: true }).click(); await page.getByLabel(`Type "${title}" to confirm`).fill(title); await page.getByRole('button', { name: 'Delete case', exact: true }).last().click(); await expect(page.getByRole('dialog')).not.toBeVisible();
   } finally {
-    const session = await (await page.request.get('/api/session')).json();
-    const cases = await (await page.request.get('/api/cases')).json();
+    const session = await (await page.request.get('/api/session', { maxRetries: 1 })).json();
+    const cases = await (await page.request.get('/api/cases', { maxRetries: 1 })).json();
     const created = cases.find((c: { title: string; fictional: boolean }) => c.title === title && c.fictional);
     if (created) await page.request.delete(`/api/cases/${created.id}`, { headers: { 'x-relay-csrf': session.csrf }, data: { confirm: title } });
   }
@@ -585,7 +585,7 @@ test.describe('follow-up editing across time zones', () => {
   test.use({ timezoneId: 'America/New_York' });
   test('stored time zones render correctly and rescheduling saves all reviewed details', async ({ page }, info) => {
     await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
-    const session = await (await page.request.get('/api/session')).json();
+    const session = await (await page.request.get('/api/session', { maxRetries: 1 })).json();
     const headers = { 'x-relay-csrf': session.csrf };
     const title = `Follow-up test ${info.project.name} ${Date.now()}`;
     const created = await page.request.post('/api/cases', { headers, data: { title, person: 'Fictional timezone test', equipment: 'Chair', reference: '', category: 'Other', fictional: true } });
@@ -595,7 +595,7 @@ test.describe('follow-up editing across time zones', () => {
         const result = await page.request.post('/api/action', { headers, data: { tool: 'record_repair_event', args: { caseId: c.id, requestId: crypto.randomUUID(), party: 'supplier', source: 'Fictional supplier', channel: 'Email', occurredAt: new Date(Date.now() - 60000).toISOString(), text: 'Fictional update for testing.', stage } } });
         expect(result.ok()).toBe(true);
       }
-      const brief = (await (await page.request.get(`/api/cases/${c.id}`)).json()).data;
+      const brief = (await (await page.request.get(`/api/cases/${c.id}`, { maxRetries: 1 })).json()).data;
       const parts = brief.questions.find((q: { kind: string }) => q.kind === 'parts');
       const loaner = brief.questions.find((q: { kind: string }) => q.kind === 'loaner');
       const dueAt = new Date(Date.now() + 172800000).toISOString();
@@ -615,13 +615,13 @@ test.describe('follow-up editing across time zones', () => {
       await page.getByRole('button', { name: 'Reschedule', exact: true }).click();
       await expect(page.getByRole('dialog')).not.toBeVisible();
       await expect(page.getByText('Ask about temporary equipment', { exact: true })).toBeVisible();
-      const updated = (await (await page.request.get(`/api/cases/${c.id}`)).json()).data.followups.find((f: { id: string }) => f.id === followup.id);
+      const updated = (await (await page.request.get(`/api/cases/${c.id}`, { maxRetries: 1 })).json()).data.followups.find((f: { id: string }) => f.id === followup.id);
       expect(updated.title).toBe('Ask about temporary equipment'); expect(updated.questionId).toBe(loaner.id); expect(updated.timezone).toBe('America/New_York');
       expect(updated.dueAt.slice(0, 16)).toBe(dueAt.slice(0, 16));
       await page.getByRole('button', { name: 'Reschedule Ask about temporary equipment', exact: true }).click();
       await page.getByLabel('Related question').selectOption(''); await page.getByRole('button', { name: 'Reschedule', exact: true }).click();
       await expect(page.getByRole('dialog')).not.toBeVisible();
-      const cleared = (await (await page.request.get(`/api/cases/${c.id}`)).json()).data.followups.find((f: { id: string }) => f.id === followup.id);
+      const cleared = (await (await page.request.get(`/api/cases/${c.id}`, { maxRetries: 1 })).json()).data.followups.find((f: { id: string }) => f.id === followup.id);
       expect(cleared.questionId).toBeNull();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       await page.screenshot({ path: `.data/screenshots/${info.project.name}-followup-timezone.png`, fullPage: true });

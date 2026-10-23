@@ -2,10 +2,10 @@ import { test, expect } from '@playwright/test';
 import type { AgentReply, Brief, RepairCase } from '../shared/types';
 
 test('natural conversation survives reload, prepares only the referenced draft and rejects stale context', async ({ page }, info) => {
-  const session = await (await page.request.get('/api/session')).json(); const headers = { 'x-relay-csrf': session.csrf };
+  const session = await (await page.request.get('/api/session', { maxRetries: 1 })).json(); const headers = { 'x-relay-csrf': session.csrf };
   const created = await page.request.post('/api/cases', { headers, data: { title: `Fictional conversation ${info.project.name}`, person: 'Fictional tester', equipment: 'Power wheelchair', reference: 'CONVERSATION-TEST', category: 'Paperwork', fictional: true } });
   expect(created.ok()).toBe(true); const repair: RepairCase = await created.json();
-  const brief = async (): Promise<Brief> => (await (await page.request.get(`/api/cases/${repair.id}`)).json()).data;
+  const brief = async (): Promise<Brief> => (await (await page.request.get(`/api/cases/${repair.id}`, { maxRetries: 1 })).json()).data;
   const openRelay = async () => { if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click(); };
   const send = async (text: string): Promise<AgentReply> => {
     await page.getByRole('textbox', { name: 'Message to Relay', exact: true }).fill(text);

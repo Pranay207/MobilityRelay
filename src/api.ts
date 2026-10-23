@@ -4,8 +4,17 @@ let csrf = '';
 export function setCsrf(value: string) { csrf = value; }
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const deadline = (options.method ?? 'GET').toUpperCase() === 'GET' ? AbortSignal.timeout(10000) : undefined;
+  const request = { ...options, ...(deadline ? { signal: options.signal ? AbortSignal.any([deadline, options.signal]) : deadline } : {}), headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-Relay-CSRF': csrf } : {}), ...options.headers } };
   try {
-    const response = await fetch(path, { ...options, ...(deadline ? { signal: options.signal ? AbortSignal.any([deadline, options.signal]) : deadline } : {}), headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-Relay-CSRF': csrf } : {}), ...options.headers } });
+    let response: Response;
+    for (let attempt = 0; ; attempt++) {
+      try { response = await fetch(path, request); break; }
+      catch (error) {
+        // Only a failed read connection may retry, within its original budget.
+        if (deadline && attempt === 0 && error instanceof TypeError && !deadline.aborted && !options.signal?.aborted) continue;
+        throw error;
+      }
+    }
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || `Request failed (${response.status}).`);
     return result as T;

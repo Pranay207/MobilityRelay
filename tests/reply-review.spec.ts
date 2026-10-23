@@ -4,7 +4,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import type { Brief, Draft, RepairCase } from '../shared/types';
 
 async function fixture(page: Page, project: string) {
-  const session = await (await page.request.get('/api/session')).json(); const headers = { 'x-relay-csrf': session.csrf };
+  const session = await (await page.request.get('/api/session', { maxRetries: 1 })).json(); const headers = { 'x-relay-csrf': session.csrf };
   const create = await page.request.post('/api/cases', { headers, data: { title: `Reply review ${project} ${Date.now()}`, person: 'Fictional Reviewer', equipment: 'Power wheelchair', reference: 'REPLY-TEST', category: 'Paperwork clarification', fictional: true } });
   expect(create.ok()).toBe(true); const repair: RepairCase = await create.json();
   const call = async <T,>(tool: string, args: object): Promise<T> => { const response = await page.request.post('/api/action', { headers, data: { tool, args } }); expect(response.ok(), await response.text()).toBe(true); return (await response.json()).data; };
@@ -12,7 +12,7 @@ async function fixture(page: Page, project: string) {
   await event('paperwork_sent', 'We sent the estimate.'); await event('paperwork_requested', 'We cannot locate the estimate.'); await event('authorization_pending', 'Authorization is pending.');
   const contactResponse = await page.request.post('/api/contacts', { headers, data: { caseId: repair.id, name: 'Fictional Insurer', role: 'insurer', email: 'test@insurer.example', verified: false } }); expect(contactResponse.ok()).toBe(true);
   const contact = await contactResponse.json();
-  const brief = async (): Promise<Brief> => (await (await page.request.get(`/api/cases/${repair.id}`)).json()).data;
+  const brief = async (): Promise<Brief> => (await (await page.request.get(`/api/cases/${repair.id}`, { maxRetries: 1 })).json()).data;
   const oldDraft = await call<Draft>('prepare_repair_request', { caseId: repair.id, requestId: crypto.randomUUID(), recipientId: contact.id, questionIds: (await brief()).questions.filter(q => !q.resolved).map(q => q.id), subject: 'Old receipt request', body: 'OLD DRAFT BODY asking about receipt.' });
   const choose = async () => { if ((await page.viewportSize())!.width <= 760) await page.getByRole('button', { name: 'Open case navigation', exact: true }).click(); await page.getByRole('button', { name: new RegExp(repair.title) }).click(); await expect(page.getByRole('heading', { name: repair.title, exact: true })).toBeVisible(); };
   const open = async () => { await page.getByRole('button', { name: 'Review reply', exact: true }).click(); await page.getByRole('combobox', { name: 'Reply from', exact: true }).selectOption('insurer'); await page.getByRole('textbox', { name: 'Source name', exact: true }).fill('Fictional Insurer'); await page.getByRole('textbox', { name: 'Reply text', exact: true }).fill('We received the estimate. Reference AB-47. Authorization is still pending.'); await page.getByRole('textbox', { name: 'Reply reference', exact: true }).fill('AB-47'); };

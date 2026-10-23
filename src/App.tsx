@@ -31,6 +31,7 @@ export default function App() {
   const [brief, setBrief] = useState<Brief | null>(null); const [messages, setMessages] = useState<ChatMessage[]>([]); const [settings, setSettings] = useState<Settings | null>(null);
   const [conversationReady, setConversationReady] = useState(false);
   const [caseLoadError, setCaseLoadError] = useState('');
+  const [workspaceLoadError, setWorkspaceLoadError] = useState('');
   const [tab, setTab] = useState<Tab>('Overview'); const [dialog, setDialog] = useState<Dialog | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [search, setSearch] = useState(''); const [sidebar, setSidebar] = useState(false); const [highlight, setHighlight] = useState(''); const [traces, setTraces] = useState<ToolTrace[]>([]);
   const caseNavigation = useRef<HTMLElement>(null);
@@ -63,13 +64,24 @@ export default function App() {
       if (current()) { setMessages(chat); setConversationReady(true); }
     } catch (err) { if (current()) { if (!loaded) setCaseLoadError(err instanceof Error ? err.message : 'Case could not be loaded.'); setConversationReady(true); throw err; } }
   };
-  useEffect(() => { void api<{ authenticated: boolean; csrf?: string }>('/api/session').then(async result => {
-    if (result.csrf) setCsrf(result.csrf); setAuthenticated(result.authenticated);
-    if (result.authenticated) { const [settings, list] = await Promise.all([api<Settings>('/api/settings'), loadCases()]); setSettings(settings); setSelected(initialCase(list)); }
-    setReady(true);
-  }).catch(err => { setError(err.message); setReady(true); }); }, []);
-  useEffect(() => { if (!selected || !authenticated) return; setBrief(null); setMessages([]); setConversationReady(false); setCaseLoadError(''); setHighlight(''); void refresh(selected, cases).catch(err => setError(err.message)); }, [selected, authenticated]);
-  useEffect(() => { if (!authenticated) return; const timer = setInterval(() => { if (!busy) void refresh().catch(() => {}); }, 20000); return () => clearInterval(timer); }, [authenticated, busy]);
+  const loadWorkspace = async () => {
+    try {
+      const [nextSettings, list] = await Promise.all([api<Settings>('/api/settings'), loadCases()]);
+      setSettings(nextSettings); setSelected(initialCase(list)); setWorkspaceLoadError('');
+    } catch (err) { setWorkspaceLoadError(err instanceof Error ? err.message : 'Workspace could not be loaded.'); throw err; }
+  };
+  const initialize = async () => {
+    refreshGeneration.current++; setReady(false); setWorkspaceLoadError(''); setError('');
+    try {
+      const result = await api<{ authenticated: boolean; csrf?: string }>('/api/session');
+      setCsrf(result.csrf ?? ''); setAuthenticated(result.authenticated);
+      if (result.authenticated) await loadWorkspace();
+    } catch (err) { setWorkspaceLoadError(err instanceof Error ? err.message : 'Workspace could not be loaded.'); }
+    finally { setReady(true); }
+  };
+  useEffect(() => { void initialize(); }, []);
+  useEffect(() => { if (!selected || !authenticated || !ready || workspaceLoadError) return; setBrief(null); setMessages([]); setConversationReady(false); setCaseLoadError(''); setHighlight(''); void refresh(selected, cases).catch(err => setError(err.message)); }, [selected, authenticated, ready, workspaceLoadError]);
+  useEffect(() => { if (!authenticated || !ready || workspaceLoadError) return; const timer = setInterval(() => { if (!busy) void refresh().catch(() => {}); }, 20000); return () => clearInterval(timer); }, [authenticated, busy, ready, workspaceLoadError]);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 6000); return () => clearTimeout(timer); }, [notice]);
   useEffect(() => {
     if (dialog?.type !== 'request' || !brief) return;
@@ -83,7 +95,8 @@ export default function App() {
     setBusy(true); setError('');
     try {
       const result = await post<AgentReply>('/api/agent', { caseId, text, allowCloud }); addTraces(result.traces);
-      const readOnly = !result.action && !result.draftId && result.traces.length > 0 && result.traces.every(trace => trace.ok && ['get_repair_brief', 'export_repair_packet'].includes(trace.tool));
+      const reviewOnly = result.action === 'record' || result.action === 'reply' || result.action === 'prepare';
+      const readOnly = (!result.action || reviewOnly) && !result.draftId && result.traces.length > 0 && result.traces.every(trace => trace.ok && ['get_repair_brief', 'export_repair_packet'].includes(trace.tool));
       if (readOnly) {
         // The verified read did not change case data; only conversation history changed.
         const chat = await api<ChatMessage[]>(`/api/cases/${caseId}/chat`);
@@ -112,7 +125,8 @@ export default function App() {
     : <aside className="assistant" aria-label="Simulated Alexa+ repair conversation"><div className="assistant-heading"><div className="relay-icon"><AudioLines size={22} /></div><div><h2>Relay</h2><span className="simulator-label">Alexa+ experience simulator</span></div></div><div className="conversation is-empty" role="status">Loading conversation...</div></aside>;
 
   if (!ready) return <div className="startup"><LoaderCircle className="spin" size={28} /><p>Opening MobilityRelay...</p></div>;
-  if (!authenticated) return <main className="login"><Brand /><h1>Sign in to your workspace</h1>{error && <p role="alert" className="error">{error}</p>}<form onSubmit={e => { e.preventDefault(); void run(async () => { const result = await post<{ csrf: string }>('/api/login', { password }); setCsrf(result.csrf); setAuthenticated(true); setSettings(await api('/api/settings')); await loadCases().then(list => setSelected(initialCase(list))); }); }}><label>Workspace password<input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required /></label><button className="primary" disabled={busy}>Sign in</button></form></main>;
+  if (workspaceLoadError) return <main className="startup"><CircleHelp size={28} /><h1>Workspace could not be loaded</h1><p role="alert">{workspaceLoadError}</p><button className="secondary" disabled={busy} onClick={() => void initialize()}><RefreshCw size={17} /> Retry loading workspace</button></main>;
+  if (!authenticated) return <main className="login"><Brand /><h1>Sign in to your workspace</h1>{error && <p role="alert" className="error">{error}</p>}<form onSubmit={e => { e.preventDefault(); void run(async () => { const result = await post<{ csrf: string }>('/api/login', { password }); setCsrf(result.csrf); setAuthenticated(true); await loadWorkspace(); }); }}><label>Workspace password<input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required /></label><button className="primary" disabled={busy}>Sign in</button></form></main>;
   return <FeedbackContext.Provider value={{ error, busy }}><div className="app-shell">
     {sidebar && <button className="sidebar-scrim" aria-label="Close case navigation" onClick={() => setSidebar(false)} />}
     <aside className={`sidebar ${sidebar ? 'mobile-open' : ''}`}><Brand><IconButton label="Close navigation" className="mobile-only" onClick={() => setSidebar(false)}><X size={18} /></IconButton></Brand><div className="workspace-label"><span className="status-dot" /> Repair workspace</div><div className="nav-heading"><span>YOUR CASES</span><IconButton label="Create case" onClick={() => setDialog({ type: 'case' })} disabled={busy}><Plus size={18} /></IconButton></div><label className="case-search"><Search size={16} /><input aria-label="Search cases" value={search} onChange={e => setSearch(e.target.value)} placeholder="Find a case" /></label><nav ref={caseNavigation} aria-label="Repair cases">{cases.filter(c => `${c.title} ${c.person} ${c.reference}`.toLowerCase().includes(search.toLowerCase())).map(c => <button key={c.id} className={`case-nav ${selected === c.id ? 'selected' : ''}`} onClick={() => choose(c.id)} disabled={busy}><span className="case-avatar">{c.person.slice(0, 1).toUpperCase()}</span><span><strong>{c.title}</strong><small>{c.person} <span> / </span> {c.reference || c.category}</small></span>{selected === c.id && <ChevronRight size={15} />}</button>)}</nav><button className="new-case" onClick={() => setDialog({ type: 'case' })} disabled={busy}><Plus size={17} /> New repair case</button><div className="sidebar-bottom"><button onClick={() => setDialog({ type: 'settings' })}><Settings2 size={17} /> Workspace settings</button><div className="local-status"><span className="status-dot" /><span>{settings?.mailMode === 'smtp' ? 'SMTP configured' : 'Local outbox'}<small>{settings?.protected ? 'Password protected' : 'Local device access'}</small></span><ShieldCheck size={16} /></div></div></aside>

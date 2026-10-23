@@ -321,6 +321,23 @@ test('read-only assistant replies update conversation without a redundant case r
   expect(caseReads).toEqual([]);
 });
 
+test('review-only speech proposals open without a redundant case reload or evidence write', async ({ page }, info) => {
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+  const input = page.getByRole('textbox', { name: 'Message to Relay', exact: true });
+  await input.fill('Record: Northbridge Mobility said by phone that the replacement part is delayed.');
+  let caseReads = 0; let evidenceWrites = 0;
+  await page.route(/\/api\/cases\/[a-f0-9-]{36}$/, route => { caseReads++; return route.fulfill({ status: 503, json: { error: 'Fictional redundant read must not be needed.' } }); });
+  page.on('request', request => { if (new URL(request.url()).pathname === '/api/action' && request.method() === 'POST') evidenceWrites++; });
+  const response = page.waitForResponse(result => result.url().endsWith('/api/agent') && result.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  const result = await (await response).json(); expect(result.action).toBe('record');
+  expect(result.traces.map((trace: { tool: string }) => trace.tool)).toEqual(['get_repair_brief']);
+  const review = page.getByRole('dialog', { name: 'Record an update', exact: true }); await expect(review).toBeVisible();
+  await expect(review.getByRole('button', { name: 'Record update', exact: true })).toBeDisabled();
+  expect(caseReads).toBe(0); expect(evidenceWrites).toBe(0);
+});
+
 test('Bedrock-labelled UI can submit local commands without cloud consent and retains a rejected model request', async ({ page }, info) => {
   await page.route('**/api/settings', async route => { const response = await route.fetch(); await route.fulfill({ json: { ...await response.json(), agentMode: 'bedrock' } }); });
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
@@ -390,7 +407,7 @@ test('failed assistant requests retain typed input and never narrate success', a
 test('long case fields and request review fit narrow and wide viewports', async ({ page }, info) => {
   test.setTimeout(120000);
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
-  const session = await (await page.request.get('/api/session')).json(); const headers = { 'x-relay-csrf': session.csrf };
+  const session = await (await page.request.get('/api/session', { maxRetries: 1 })).json(); const headers = { 'x-relay-csrf': session.csrf };
   const title = 'LongCaseName'.repeat(8);
   const response = await page.request.post('/api/cases', { headers, data: { title, person: 'FictionalLongName'.repeat(4), equipment: 'WheelchairDescription'.repeat(4), reference: 'Reference'.repeat(8), category: 'LongCategory'.repeat(6), fictional: true } });
   expect(response.ok()).toBe(true); const repair = await response.json();
@@ -402,7 +419,7 @@ test('long case fields and request review fit narrow and wide viewports', async 
   try {
     const contactResponse = await page.request.post('/api/contacts', { headers, data: { caseId: repair.id, name: 'Fictional supplier', role: 'supplier', email: `${'x'.repeat(64)}@${'b'.repeat(50)}.example`, verified: false } }); expect(contactResponse.ok()).toBe(true); const contact = await contactResponse.json();
     const event = await page.request.post('/api/action', { headers, data: { tool: 'record_repair_event', args: { caseId: repair.id, requestId: crypto.randomUUID(), party: 'supplier', source: 'FictionalSource'.repeat(10), channel: 'Email', occurredAt: new Date(Date.now() - 60000).toISOString(), stage: 'parts_delayed', text: 'LongUnbrokenSourceText'.repeat(60) } } }); expect(event.ok()).toBe(true);
-    const brief = (await (await page.request.get(`/api/cases/${repair.id}`)).json()).data;
+    const brief = (await (await page.request.get(`/api/cases/${repair.id}`, { maxRetries: 1 })).json()).data;
     const prepared = await page.request.post('/api/action', { headers, data: { tool: 'prepare_repair_request', args: { caseId: repair.id, requestId: crypto.randomUUID(), recipientId: contact.id, questionIds: brief.questions.map((question: { id: string }) => question.id) } } }); expect(prepared.ok()).toBe(true);
     if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open case navigation', exact: true }).click();
     await page.getByRole('button', { name: new RegExp(title) }).click(); await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();

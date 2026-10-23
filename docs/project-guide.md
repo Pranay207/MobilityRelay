@@ -440,8 +440,8 @@ discovery are separately bounded. A domain rejection preserves the healthy clien
 a transport/protocol failure invalidates it, and only a later request reconnects.
 Shutdown closes the client and dispatcher. Standalone diagnostic clients remain
 short-lived. There is no automatic write retry or global dispatcher replacement. Read-only
-replies refresh chat without a redundant case read; writes/review proposals and
-periodic synchronization still refresh case data.
+replies and read-only review proposals refresh chat without a redundant case
+read; actual mutations and periodic synchronization still refresh case data.
 
 ### Privacy and Approval
 
@@ -502,10 +502,54 @@ single completion percentage across code, validation and submission.
 
 | Area | Current Evidence | Remaining Limit |
 | --- | --- | --- |
-| Tech Implementation | Six real Streamable HTTP MCP tools; persistence, reviewed writes, exact-message approval, grounded conversation and exports; production build and 227/227 unit/integration tests pass. Actual Ollama read interpretation, the six-tool workflow and a fresh production-container build/smoke test passed. | General model accuracy is not established; complex inference may be slow. Native Alexa+, Bedrock, SMTP delivery and the full Ollama/HTTPS Compose stack are not live-verified. |
-| Design | Latest full Edge audit: 123/130 passed; seven timing/refresh failures. A subsequent 14/14 focused desktop/mobile run passed, covering every failed journey without weaker assertions or longer timeouts. Earlier full 128/128 results remain below. | A fresh clean 130-check run is still pending; the initial failures' root cause was not conclusively isolated. Controlled speech is not physical microphone, screen-reader or independent usefulness validation. |
+| Tech Implementation | Six real Streamable HTTP MCP tools; persistence, reviewed writes, exact-message approval, grounded conversation and exports; production build and 231/231 unit/integration tests pass. Actual Ollama read interpretation, the six-tool workflow and an earlier fresh production-container baseline passed. | General model accuracy is not established; complex inference may be slow. The latest client patch has not had a fresh image test. Native Alexa+, Bedrock, SMTP delivery and the full Ollama/HTTPS Compose stack are not live-verified. |
+| Design | The latest pre-fix full Edge audit passed 127/130. Focused startup, review and post-login checks passed during the reliability fixes. Earlier full 128/128 and failed attempts remain below. | The complete 142-check post-fix run is pending. Connection-reset root cause is not conclusively isolated. Controlled speech is not physical microphone, screen-reader or independent usefulness validation. |
 | Potential Impact | Sourced coordination problem and a complete fictional case from conflicting reports to reviewed follow-up and export. | No independent user study, measured benefit versus notes/email, or evidence of shorter repairs. |
 | Quality of the Idea | Neutral cross-party records, source-backed questions and receipt-versus-authorization review form a coherent workflow. | Global uniqueness and a competition score are not established. |
+
+### Submission Reliability Fixes: October 23
+
+The subsequent complete rerun passed **127/130**, not a clean result. One
+startup read timed out and its cleanup hit a reset; one persona failed during
+an API fixture's session read; one voice-review form appeared after the
+five-second assertion window. Its trace showed an unnecessary case read taking
+**4,583 ms** before the form opened. These observations do not establish the
+root cause of the intermittent connection resets. Retained report:
+`.data/verification/browser-submission-recheck-2026-10-23.json`.
+
+Changes made from those observations:
+
+- GET connection failures retry once within the original ten-second deadline;
+  HTTP errors, cancellation and writes are not automatically retried.
+- Failed session/settings/case-list startup has an explicit recovery screen,
+  not an apparently empty workspace. Recovery is read-only, including after
+  login; case refresh waits for successful initialization.
+- Read-only record/reply/recipient-selection proposals update conversation and
+  open review without a redundant case reload. Actual mutations still refresh
+  the case, and saving/sending still requires the existing user controls.
+- Playwright fixture GETs allow one `ECONNRESET` retry using the supported
+  `maxRetries` option. POST/DELETE requests, assertions and test timeouts are
+  unchanged. This is a read-request retry, not a whole-test retry.
+  [Playwright request options](https://playwright.dev/docs/api/class-apirequestcontext).
+
+Two read-recovery unit tests failed before the change; all six API-helper tests
+then passed, including no replay of an uncertain POST. Build/backend result:
+**231/231 passed**, log
+`.data/verification/check-submission-reliability-2026-10-23.log`.
+The initial focused startup run passed **8/8**; the review/refresh run passed
+**8/8**. A controlled post-login failure then reproduced a loading-state race
+on both viewports. Gating case refresh on initialized workspace state fixed it;
+the unchanged test passed **2/2 in 32.2 seconds**. The authentication response is
+controlled in that UI test; real password/session enforcement has separate
+backend coverage. Reports:
+
+- `.data/verification/browser-startup-recovery-2026-10-23.json`
+- `.data/verification/browser-review-recovery-2026-10-23.json`
+- `.data/verification/browser-post-login-recovery-2026-10-23.json` (failed attempt)
+- `.data/verification/browser-post-login-recovery-fixed-2026-10-23.json`
+
+The complete post-fix suite now contains **142 desktop/mobile checks**. Its
+complete rerun is pending; focused passes are not a clean full-suite claim.
 
 ### End-to-End QA Audit: October 23
 
@@ -1800,7 +1844,8 @@ not independent user feedback. [Official FAQ](https://amazonappdev2026.devpost.c
 - [ ] Recommended, not compulsory: complete an unfamiliar person's fictional task; record failures and feedback.
 - [x] Complete a scripted fictional UI task, record timings/clarity risks and inspect the actual export (October 21). This does not replace the unfamiliar-person check.
 - [ ] If claiming delivery, test SMTP to an inbox you control and distinguish acceptance from receipt. Otherwise keep capture labels.
-- [x] Recheck current rules and FAQ (October 19): the own-simulator route is accepted and public hosting is optional.
+- [x] Recheck current rules and FAQ (October 23): the own-simulator route is accepted and public hosting is optional. Private-repo reviewers and the public demo still need verification.
+- [x] Add bounded read-only connection recovery and explicit startup retry, including controlled post-login recovery; remove the redundant case fetch before read-only review proposals (October 23).
 - [ ] Confirm reviewer access/invitations and submission fields. One reviewer invitation may not cover all requirements. For a private repo, check the current required reviewer list and accepted invitations; otherwise verify public access and detectable licensing.
 - [ ] Publish an English video under three minutes, with fictional data and honest integration labels.
 - [ ] Submit feedback for every relevant product actually used; fill the log below as observations happen.
@@ -1912,6 +1957,7 @@ positives, friction and whether we would use the tool again.
 | Oct 23: application speech playback | Enabling sound after a reply did not replay it; the creator reported no audible output. | Replay the latest reply on explicit opt-in, prefer available English voices, resume paused synthesis and report silent startup. Suggest testing opt-in after history has loaded, not only before a new reply. | 18/18 focused browser checks passed. Creator subsequently reported hearing the reply; not an independent speech-accuracy study. |
 | Oct 23: application timestamp handling | String ordering of valid ISO timestamps with different UTC offsets selected the wrong stage or next follow-up. Source dates could be labelled UTC without conversion. | Compare instants consistently and normalize explicit UTC labels while preserving raw evidence and reviewed messages. Suggest offset-crossing and equal-instant fixtures, not just `Z` timestamps. | Four regressions failed before the fix and pass afterward; targeted real-MCP desktop/mobile checks passed 2/2. |
 | Oct 23: npm / transitive dependency | The current audit reported a moderate `ip-address@10.7.3` advisory. Registry TLS initially failed on this Windows host. | Updated the compatible transitive dependency to 10.7.4 and used Node system trust roots, keeping TLS verification enabled. Suggest separating environment trust errors from actual audit results. | Production and full npm audits then reported zero known advisories; [upstream advisory](https://github.com/advisories/GHSA-rxp7-6hxx-x8q5). This is not proof of complete security. |
+| Oct 23: application startup and review latency | A failed startup could look like an empty workspace. Read-only proposals waited for a redundant case read; one measured 4,583 ms. A controlled post-login failure also exposed an initialization race. | Explicit read-only recovery, one bounded GET connection retry and initialized-state gating; review-only proposals no longer reload unchanged case data. Fixture GETs allow one documented reset retry, never write replay. | Regression attempts and focused results are retained in the submission reliability section. The original connection-reset cause is not established; no unconditional smoothness claim. |
 | Pending: Bedrock | No real account/model-enabled run observed. | Record access, tool use, latency/cost only after a controlled live test. No live AWS qualification claimed. | Optional `server/agent.ts` adapter, not live evidence. |
 | Pending: SMTP provider | No real provider delivery test observed. | Keep capture labels; record TLS setup, acceptance/error and receipt separately after testing. | No provider feedback claimed yet. |
 
