@@ -70,7 +70,13 @@ for (const mode of ['local', 'bedrock', 'ollama'] as const) test(`${mode} HTTP c
     if (mode === 'bedrock') for (const text of ['Why is that?', 'Show my case status and remind me tomorrow', 'Export my case history as JSON', 'Prepare a detailed request to the supplier']) {
       const response = await ask(text); assert.equal(response.status, 403); assert.match((await response.json()).error, /Consent/);
     }
-    const reports = await ask('Compare the supplier and insurer reports'); assert.equal(reports.status, 200);
+    const misheard = 'Compare the. Issue and supplier. Reports.';
+    const clarification = await ask(misheard); assert.equal(clarification.status, 200);
+    const suggestion = await clarification.json() as AgentReply; assert.equal(suggestion.suggestedCommand, 'compare_reports');
+    assert.deepEqual(suggestion.traces.map(trace => trace.tool), ['get_repair_brief']);
+    const reviewHistory = await (await fetch(`${running.url}/api/cases/${repair.id}/chat`, { headers })).json() as ChatMessage[];
+    assert.equal(reviewHistory.at(-2)?.text, misheard); assert.equal(reviewHistory.at(-1)?.suggestedCommand, 'compare_reports');
+    const reports = await ask('Compare the. Supplier and insurer. Reports.'); assert.equal(reports.status, 200);
     const comparison = await reports.json() as AgentReply;
     assert.ok(comparison.spokenText); assert.ok(comparison.spokenText.length < comparison.reply.length);
     const history = await (await fetch(`${running.url}/api/cases/${repair.id}/chat`, { headers })).json() as ChatMessage[];

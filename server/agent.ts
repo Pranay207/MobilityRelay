@@ -7,7 +7,7 @@ import type { ToolCaller } from './mcp.js';
 import { mcpCatalog } from './mcp.js';
 import { AppError } from './store.js';
 import { toolSchemas, type ToolName } from './schemas.js';
-import { commandText, directCaseCommand, directDraftCommand, localIntent, proposesTomorrow, proposeReply, proposeUpdate, reportCommand, requestQuestionKinds } from './intents.js';
+import { commandText, directCaseCommand, directDraftCommand, localIntent, needsReportClarification, proposesTomorrow, proposeReply, proposeUpdate, reportCommand, requestQuestionKinds } from './intents.js';
 import { ollamaConverse } from './ollama.js';
 
 export type { AgentReply } from '../shared/types.js';
@@ -19,6 +19,7 @@ export async function respond(input: { caseId: string; text: string; allowCloud:
   const intent = localIntent(input.text);
   const report = reportCommand(input.text);
   if (report) return { ...reportedReply(brief, report), traces };
+  if (needsReportClarification(input.text)) return { reply: 'I could not confidently interpret that comparison. Did you mean the supplier and insurer reports? No case records were changed.', suggestedCommand: 'compare_reports', traces };
   if (intent === 'read' && /\b(?:have|did)\s+you\b/i.test(input.text) && /\b(?:sent|send|emailed|delivered)\b/i.test(input.text)) {
     const labels: Record<Draft['status'], string> = { draft: 'awaiting approval', captured: 'captured locally, not delivered', sent: 'SMTP accepted, receipt unconfirmed', sending: 'delivery in progress', unknown: 'delivery outcome unknown', failed: 'failed' };
     const statuses = Object.entries(labels).flatMap(([status, label]) => { const count = brief.drafts.filter(draft => draft.status === status).length; return count ? [`${count} ${label}`] : []; });

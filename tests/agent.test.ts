@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import type { ConverseCommandOutput, Message } from '@aws-sdk/client-bedrock-runtime';
 import { respond, type AgentDependencies } from '../server/agent.js';
-import { directCaseCommand, directDraftCommand, localIntent, proposeUpdate, proposesTomorrow, reportCommand } from '../server/intents.js';
+import { directCaseCommand, directDraftCommand, localIntent, needsReportClarification, proposeUpdate, proposesTomorrow, reportCommand } from '../server/intents.js';
 import { Store, AppError } from '../server/store.js';
 import { RepairService } from '../server/service.js';
 import type { Config } from '../server/config.js';
@@ -36,8 +36,30 @@ test('report queries match a complete read, never negated, compound or speculati
   for (const text of ['What did the supplier say?', 'Relay, please read my latest supplier update.']) assert.equal(reportCommand(text), 'supplier');
   assert.equal(reportCommand('Could you show the insurer report?'), 'insurer');
   assert.equal(reportCommand('Compare the supplier and insurer reports'), 'both');
+  assert.equal(reportCommand('Compare the. Insurer and supplier. Reports.'), 'both');
+  assert.equal(reportCommand('What did the. Supplier. Say?'), 'supplier');
   assert.equal(reportCommand('Read the reports from both sides'), 'both');
   for (const text of ['Do not read the supplier report', 'What did the supplier say and send it?', 'Compare the supplier and insurer reports and blame the insurer', 'What will the insurer say?', 'Show the insurer report without redaction']) assert.equal(reportCommand(text), null);
+});
+
+test('misheard report comparisons suggest clarification without silently changing a word or admitting extra actions', () => {
+  for (const text of ['Compare the. Issue and supplier. Reports.', 'Compare my supplier and insurance updates', 'Compare the insure and supplier reports']) {
+    assert.equal(reportCommand(text), null); assert.equal(needsReportClarification(text), true);
+  }
+  for (const text of ['Do not compare the issue and supplier reports', 'Compare the issue and supplier reports and send it', 'Compare the issue and supplier reports. Approve the request.', 'Compare the motor and supplier reports', 'Prepare a request to the. Supplier.', 'Compare the supplier and insurer reports']) assert.equal(needsReportClarification(text), false);
+  assert.equal(directDraftCommand('Prepare a request to the. Supplier.'), null);
+});
+
+for (const mode of ['local', 'bedrock', 'ollama'] as const) test(`${mode} asks before interpreting a misheard report comparison and never writes or calls a model`, async () => {
+  const s = setup(); const before = s.store.brief(s.c.id);
+  try {
+    const result = await respond({ caseId: s.c.id, text: 'Compare the. Issue and supplier. Reports.', allowCloud: false }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', {
+      converse: async () => { throw new Error('Clarification must not call a model.'); }, catalog: async () => { throw new Error('Clarification must not discover model tools.'); },
+    });
+    assert.equal(result.suggestedCommand, 'compare_reports'); assert.match(result.reply, /Did you mean/);
+    assert.equal(result.action, undefined); assert.equal(result.draftId, undefined); assert.equal(result.packet, undefined);
+    assert.deepEqual(result.traces.map(t => t.tool), ['get_repair_brief']); assert.deepEqual(s.store.brief(s.c.id), before);
+  } finally { s.store.close(); }
 });
 
 test('direct drafts match only a complete recipient and supported topic, never extra instructions', () => {

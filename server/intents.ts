@@ -4,11 +4,20 @@ export function commandText(input: string) {
   return input.trim().replace(/^(?:alexa|relay)\s*[,.:]?\s+/i, '').replace(/^(?:(?:please|can you|could you|would you)\s+){1,3}/i, '').trim();
 }
 
+// Speech punctuation may separate known read-command words; never apply this to writes.
+function reportText(input: string) {
+  return commandText(input).replace(/[.!?]+$/, '').replace(/\.(?=\s)/g, ' ').trim().replace(/\s+/g, ' ');
+}
+
 export function reportCommand(input: string): 'supplier' | 'insurer' | 'both' | null {
-  const text = commandText(input).replace(/[.!?]+$/, '').trim().replace(/\s+/g, ' ');
+  const text = reportText(input);
   const party = /^(?:what did (?:the |my )?(supplier|insurer) (?:say|report)|(?:show|read) (?:me )?(?:the |my )?(?:latest )?(supplier|insurer) (?:report|update))$/i.exec(text);
   if (party) return (party[1] ?? party[2]).toLowerCase() as 'supplier' | 'insurer';
   return /^(?:compare (?:the |my )?(?:supplier and insurer|insurer and supplier) (?:reports|updates)|(?:show|read) (?:me )?(?:the |my )?(?:latest )?reports from both (?:sides|parties))$/i.test(text) ? 'both' : null;
+}
+
+export function needsReportClarification(input: string) {
+  return /^compare (?:the |my )?(?:(?:issue|insurance|insure) and supplier|supplier and (?:issue|insurance|insure)) (?:reports|updates)$/i.test(reportText(input));
 }
 
 export function directCaseCommand(input: string): 'read' | 'export' | null {
