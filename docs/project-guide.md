@@ -1895,11 +1895,13 @@ A narrated local cut is now generated: **177.1 seconds (2:57.1), 1920x1080,
 H.264 video with stereo AAC audio, approximately 13 MB**. It has not been
 uploaded or submitted. Output files are intentionally ignored by Git:
 
-- `.data/demo-video-2026-10-23/MobilityRelay-demo-1080p.mp4`: captioned cut.
+- `.data/demo-video-2026-10-23/MobilityRelay-demo-upload.mp4`: latest captioned upload cut with the shortened source credit.
+- `.data/demo-video-2026-10-23/MobilityRelay-demo-1080p.mp4`: previous captioned cut; Windows kept it locked during the final credit edit.
 - `.data/demo-video-2026-10-23/MobilityRelay-demo-narrated.mp4`: narration without burned captions.
 - `.data/demo-video-2026-10-23/captions.srt`: optional uploadable captions.
 - `.data/demo-video-2026-10-23/narration.txt`: the spoken text.
 - `.data/demo-video-2026-10-23/capture.json` and `video-report.json`: provenance and checks.
+- `.data/demo-video-2026-10-23/video-upload-report.json`: checks and exact path for the latest upload cut.
 
 `scripts/record-demo.ts` uses a separate in-memory seeded workspace and records
 actual Edge interactions. No existing user cases are modified. The capture
@@ -1957,6 +1959,9 @@ common reason for incomplete repairs. This supports the problem context, not
 MobilityRelay's effectiveness; it is not a prevalence claim about all users.
 The on-screen credit is shortened to "Source: Worobey et al., 2025."; the full
 reference and its scope remain here rather than crowding the video.
+That credit-only revision is saved as `MobilityRelay-demo-upload.mp4` because
+Windows locked the earlier `MobilityRelay-demo-1080p.mp4`. Use the upload file;
+its duration, narration, captions and walkthrough are unchanged.
 
 The first cut made the stale-warning text visible but framed the disabled
 approval control poorly. The retake scrolls the actual disabled checkbox into
