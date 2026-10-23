@@ -493,8 +493,8 @@ single completion percentage across code, validation and submission.
 
 | Area | Current Evidence | Remaining Limit |
 | --- | --- | --- |
-| Tech Implementation | Six real Streamable HTTP MCP tools; persistence, reviewed writes, exact-message approval and exports; production build and 195/195 unit/integration tests pass. | Complex inference remains slow; native Alexa+, Bedrock and SMTP delivery are not live-verified. |
-| Design | 122/122 full Edge checks pass on desktop/mobile in 12.3 minutes, including five fictional personas, loading recovery, appointment review, microphone feedback and reload protection. | Controlled transcripts are not physical microphone or screen-reader validation. A reported misheard comparison still needs recovery work. |
+| Tech Implementation | Six real Streamable HTTP MCP tools; persistence, reviewed writes, exact-message approval and exports; production build and 199/199 unit/integration tests pass. | Complex inference remains slow; native Alexa+, Bedrock and SMTP delivery are not live-verified. |
+| Design | 122/122 full Edge checks passed before the final speech-recovery change; 16/16 focused desktop/mobile regressions passed afterward in 1.5 minutes. | Controlled transcripts are not physical microphone or screen-reader validation. Physical recognition and independent usefulness still need checks. |
 | Potential Impact | Sourced coordination problem and a complete fictional case from conflicting reports to reviewed follow-up and export. | No independent user study, measured benefit versus notes/email, or evidence of shorter repairs. |
 | Quality of the Idea | Neutral cross-party records, source-backed questions and receipt-versus-authorization review form a coherent workflow. | Global uniqueness and a competition score are not established. |
 
@@ -520,10 +520,38 @@ the earlier focused report is `browser-focused-final-2026-10-23.json`.
 **Physical speech attempt:** the user reported an unmatched comparison. Its
 stored text was `Compare the. Issue and supplier. Reports.` rather than the
 intended supplier/insurer comparison. No audio was inspected, so the acoustic
-cause and physical recognition accuracy are not established. The current local
-parser rejected it without changing repair records. Editing the transcript is
-the immediate workaround; safe punctuation handling and an explicit read-only
-clarification are the next narrowly scoped fix, not a redesign of Relay.
+cause and physical recognition accuracy are not established. The original local
+parser rejected it without changing repair records.
+
+**Recovery implemented:** periods between known report-command words are now
+tolerated for reads only. Narrow ambiguous wording such as this example asks
+whether the user meant supplier/insurer reports and offers **Compare reports**.
+It never silently substitutes "insurer" for "issue" or executes the suggested
+read without the user's click. The original transcript and typed suggestion
+persist across reload. Clicking uses the current case's real MCP read; it does
+not record evidence, prepare/send a message or create a reminder. The Relay
+panel layout, dimensions and quick actions are unchanged. Punctuation recovery
+does not broaden write-command matching.
+
+After this change, the production build and **199/199 unit/integration tests**
+passed, including no-model clarification checks in all three assistant modes.
+**16/16 focused desktop/mobile checks passed in 1.5 minutes**, with zero skips
+or retries. They cover the reproduced transcript, explicit confirmation,
+history persistence, report playback, voice lifecycle, accessibility and
+case-isolation regressions. Report:
+`.data/verification/browser-speech-recovery-2026-10-23.json`. The full 122-check
+run above precedes this final change; no full 124-check rerun is claimed. The
+real microphone must be retried and independently observed feedback is pending.
+
+**Fresh scripted workflow:** `npm run measure:usefulness -- submission-2026-10-23`
+completed all six stages and exercised all six real MCP tools without an
+unexpected request or page error. The final history has receipt answered,
+authorization open, one local capture, one due item and a labelled stale draft.
+Known-identity redaction and source links were checked in the actual HTML export.
+The automated task clock was 9,341 ms; this excludes browser startup and human
+reading/decisions and is not evidence of time saved. Results and export are in
+ignored `.data/verification/usefulness-submission-2026-10-23/`. No independent
+participant, external email delivery or completed repair is claimed.
 
 **Current speed spot check:** ten exact draft commands across five fictional
 personas took **142-498 ms**, with model calls explicitly forbidden. Twenty

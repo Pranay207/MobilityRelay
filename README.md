@@ -92,6 +92,9 @@ available. Dictation shows live words, keeps listening across speech segments,
 and requires a separate send action. Manual editing cancels recording. Browser
 speech-service and microphone accuracy still need physical verification.
 An empty recording now gives recoverable feedback and preserves typed text.
+Report reads tolerate inserted periods between known command words. Supported
+ambiguous comparisons offer an explicit **Compare reports** confirmation rather
+than silently changing a misheard word; the original transcript stays in history.
 Relay can read the latest supplier or insurer report, or compare
 both with dated source numbers. Corrected records are excluded and long reports
 are labelled as excerpts. Optional report playback gives the source, date and
@@ -191,8 +194,8 @@ Windows, Node 24.11.0 and installed Microsoft Edge.
 | Check | Recorded result |
 | --- | --- |
 | TypeScript and production build | Passed. |
-| Unit and integration | **195 tests passed**, including real HTTP/MCP calls, direct drafts, bounded reads, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
-| Browser workflows | **122/122 full desktop/mobile checks passed** in 12.3 minutes, including five fictional-persona journeys, private-export reload protection, loading recovery, appointment review, branding and speech lifecycle checks. Physical recognition and independent usefulness remain unverified. Earlier failures are retained in the guide. |
+| Unit and integration | **199 tests passed**, including real HTTP/MCP calls, direct drafts, bounded reads, comparison clarification, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
+| Browser workflows | **122/122 full desktop/mobile checks passed** before the final speech-recovery change. **16/16 focused checks passed afterward** in 1.5 minutes, including the actual misheard wording, confirmation persistence, report reads, speech lifecycle, accessibility and case isolation. Physical recognition and independent usefulness remain unverified. Earlier failures are retained in the guide. |
 | Accessibility and responsive layout | No automated violations in tested states. Keyboard focus, readable text, 44px header icon controls and desktop/mobile layout checks passed. |
 
 ```sh
