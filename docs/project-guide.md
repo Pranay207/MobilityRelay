@@ -502,10 +502,103 @@ single completion percentage across code, validation and submission.
 
 | Area | Current Evidence | Remaining Limit |
 | --- | --- | --- |
-| Tech Implementation | Six real Streamable HTTP MCP tools; persistence, reviewed writes, exact-message approval, grounded conversation and exports; production build and 223/223 unit/integration tests pass. Three actual Ollama read interpretations and a separate actual-model browser draft review passed. | General model accuracy is not established; complex inference may be slow. Native Alexa+, Bedrock and SMTP delivery are not live-verified. |
-| Design | The final full Edge run passed 128/128 desktop/mobile checks in 10.8 minutes, with no failures, skips or retries. Focused audio/report and contextual/five-persona runs also passed. | Controlled transcripts are not physical microphone or screen-reader validation. The creator confirmed audible playback once; broader audio and independent usefulness still need checks. |
+| Tech Implementation | Six real Streamable HTTP MCP tools; persistence, reviewed writes, exact-message approval, grounded conversation and exports; production build and 227/227 unit/integration tests pass. Actual Ollama read interpretation, the six-tool workflow and a fresh production-container build/smoke test passed. | General model accuracy is not established; complex inference may be slow. Native Alexa+, Bedrock, SMTP delivery and the full Ollama/HTTPS Compose stack are not live-verified. |
+| Design | Latest full Edge audit: 123/130 passed; seven timing/refresh failures. A subsequent 14/14 focused desktop/mobile run passed, covering every failed journey without weaker assertions or longer timeouts. Earlier full 128/128 results remain below. | A fresh clean 130-check run is still pending; the initial failures' root cause was not conclusively isolated. Controlled speech is not physical microphone, screen-reader or independent usefulness validation. |
 | Potential Impact | Sourced coordination problem and a complete fictional case from conflicting reports to reviewed follow-up and export. | No independent user study, measured benefit versus notes/email, or evidence of shorter repairs. |
 | Quality of the Idea | Neutral cross-party records, source-backed questions and receipt-versus-authorization review form a coherent workflow. | Global uniqueness and a competition score are not established. |
+
+### End-to-End QA Audit: October 23
+
+This pass used isolated fictional records. It did not change the Relay layout,
+contact suppliers or insurers, deliver email, or modify the creator's existing
+case history. The two fixes are separate commits: `60651d0` for the dependency
+patch and `c5696d6` for timestamp handling.
+
+**Chronology defect reproduced and fixed:** valid offset timestamps were sorted
+as strings. For example, `2026-01-02T00:30:00+05:30` occurs before
+`2026-01-01T23:30:00Z`, despite its later-looking date. This could select the
+wrong current stage, reorder evidence or choose a later follow-up. The backend,
+Evidence view, Follow-ups view and next-follow-up selection now compare actual
+instants, using recorded time to break equal event times. Explicit UTC source
+dates are normalized before labelling. Original evidence timestamps and already
+reviewed draft bodies are preserved, not rewritten.
+
+Four backend regression tests failed before the fix and pass afterward. The
+new browser workflow also passed on desktop and mobile, exercising real MCP
+writes, evidence ordering, stage selection, follow-up order, conversation after
+reload and original timestamp preservation. Focused result: **2/2 passed in
+36.1 seconds**; report:
+`.data/verification/browser-offset-qa-2026-10-23.json`.
+
+**Dependency audit:** `npm audit` identified one moderate transitive advisory in
+`ip-address@10.7.3`. The compatible update to `10.7.4` changes only the lockfile;
+the production audit and full audit including development dependencies then
+reported **zero known advisories**. The registry initially failed certificate
+verification on this host; enabling Node's system trust roots resolved it
+without disabling TLS. The advisory concerns quadratic IPv6 zone parsing, not
+an established exploit against MobilityRelay.
+[Advisory GHSA-rxp7-6hxx-x8q5](https://github.com/advisories/GHSA-rxp7-6hxx-x8q5).
+Reports: `.data/verification/dependency-audit-patched-2026-10-23.json` and
+`.data/verification/dependency-audit-all-2026-10-23.json`.
+
+**Build and backend:** `npm run check` passed TypeScript, the production build
+and **227/227 tests**, with no failures or skips. The security-fixture shutdown
+logged a Vite dependency-scan cancellation warning; the run completed with exit
+code zero. Expected private-file canary denials also appear in that log. Evidence:
+`.data/verification/check-end-to-end-qa-2026-10-23.log`.
+
+**Browser audit and recovery:** the complete 130-check run finished with
+**123 passed and seven failed in 21.1 minutes**, without skips or automatic
+retries. Failures affected the desktop new-case journey and mobile conversation
+and five-persona journeys. Traces showed timing/refresh failures; a separate
+desktop reproduction also timed out, but at a different UI action. The QA server
+still answered a health probe in 293 ms. Low free memory and a stuck Docker
+shutdown were observed, but their causal role is not established.
+
+After finishing shutdown of the QA-started Docker instance and ending the
+parallel isolated run, the affected journeys and their desktop/mobile
+counterparts passed **14/14 in 2.8 minutes**, with no failures, skips, retries or
+runner errors. No application code, assertions or timeout limits changed
+between those attempts. A subsequent clean complete 130-check run has **not**
+been completed; the focused success does not erase observed flakiness or prove
+its root cause. Reports:
+
+- Full attempt: `.data/verification/browser-end-to-end-qa-2026-10-23.json`;
+  retained failure traces in ignored `test-results/`.
+- Isolated attempt: `.data/verification/browser-isolated-journey-2026-10-23.json`.
+- Focused recovery: `.data/verification/browser-end-to-end-recovery-2026-10-23.json`.
+
+**Fresh production container:** built `mobilityrelay:qa-20261023` from the
+Linux Node 24 base using a clean `npm ci` and production build. A trusted public
+CA bundle was mounted only as a BuildKit secret; it was not copied into the
+image. `npm run test:container -- mobilityrelay:qa-20261023` passed non-root
+execution, custom-port health, anonymous access denial, authenticated real MCP,
+unapproved-send rejection, private-file/build-secret exclusions and retained
+records after restart. The disposable container had no external network or
+published port and was removed with its QA volume. No messages were delivered.
+Compose configuration validation passed, but the complete model/HTTPS stack
+was not started. Evidence:
+`.data/verification/container-end-to-end-qa-2026-10-23.log`.
+
+**Actual local AI rerun:** all seven fictional conversation steps passed with
+three real `qwen2.5:1.5b` inference calls and real Streamable HTTP MCP. The
+interpreted comparison took **13,949 ms** end to end; the receipt and
+authorization explanations took **1,785 and 1,639 ms**. The contextual draft
+took **265 ms** without inference, and the export took **208 ms**. These are
+development observations during QA, not a clean performance benchmark or a
+general accuracy guarantee. No evidence was automatically saved or message
+approved. Report:
+`.data/verification/conversation-qwen2.5-1.5b-1792770302432.json`.
+
+**Six-tool UI journey rerun:** the reviewed receipt answer left authorization
+open, stale approval was blocked, a fresh reviewed request was locally captured,
+one due item survived reload and a redacted HTML history was downloaded. All
+six MCP tools were called, with no unexpected page/API failures. The scripted
+wall task clock was **8,310 ms**, excluding setup and human reading or decisions;
+this is not a human completion time, time saved or independent usefulness test.
+Final fixture: five events, two drafts, one local capture, one due item and zero
+delivered emails. Results and checked export:
+`.data/verification/usefulness-end-to-end-qa-2026-10-23/`.
 
 ### Grounded Conversation and Audible Replay: October 23
 
@@ -1817,6 +1910,8 @@ positives, friction and whether we would use the tool again.
 | Oct 23: application Vite watch configuration | Saving private verification HTML triggered development page reloads and could discard unsent input. A controlled browser regression reproduced it. | Exclude private data and generated test reports from file watching; keep private-file serving denied. Suggest testing generated exports with unsent input present. | Regression fails before the fix and passes on desktop/mobile afterward; final focused run 22/22, not a completed full-suite claim. |
 | Oct 23: application conversation / local model | The short comparison was rejected; an unnecessary tool call, invalid read pairing, irrelevant conversation context and wrong read views were observed in actual model tests. These are not established SDK/runtime defects. | Support natural read shortcuts; use JSON-schema-constrained view selection, minimal read context and deterministic outcome limits. Version-bound focus scopes contextual drafts. Suggest examples measuring correct interpretation, not just schema-valid output. | `tests/conversation.test.ts`, `tests/conversation.spec.ts`, `scripts/verify-conversation.ts`; failed attempts retained and later seven-step run passed with three real inference calls. |
 | Oct 23: application speech playback | Enabling sound after a reply did not replay it; the creator reported no audible output. | Replay the latest reply on explicit opt-in, prefer available English voices, resume paused synthesis and report silent startup. Suggest testing opt-in after history has loaded, not only before a new reply. | 18/18 focused browser checks passed. Creator subsequently reported hearing the reply; not an independent speech-accuracy study. |
+| Oct 23: application timestamp handling | String ordering of valid ISO timestamps with different UTC offsets selected the wrong stage or next follow-up. Source dates could be labelled UTC without conversion. | Compare instants consistently and normalize explicit UTC labels while preserving raw evidence and reviewed messages. Suggest offset-crossing and equal-instant fixtures, not just `Z` timestamps. | Four regressions failed before the fix and pass afterward; targeted real-MCP desktop/mobile checks passed 2/2. |
+| Oct 23: npm / transitive dependency | The current audit reported a moderate `ip-address@10.7.3` advisory. Registry TLS initially failed on this Windows host. | Updated the compatible transitive dependency to 10.7.4 and used Node system trust roots, keeping TLS verification enabled. Suggest separating environment trust errors from actual audit results. | Production and full npm audits then reported zero known advisories; [upstream advisory](https://github.com/advisories/GHSA-rxp7-6hxx-x8q5). This is not proof of complete security. |
 | Pending: Bedrock | No real account/model-enabled run observed. | Record access, tool use, latency/cost only after a controlled live test. No live AWS qualification claimed. | Optional `server/agent.ts` adapter, not live evidence. |
 | Pending: SMTP provider | No real provider delivery test observed. | Keep capture labels; record TLS setup, acceptance/error and receipt separately after testing. | No provider feedback claimed yet. |
 

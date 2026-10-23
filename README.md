@@ -211,10 +211,12 @@ Windows, Node 24.11.0 and installed Microsoft Edge.
 | Check | Recorded result |
 | --- | --- |
 | TypeScript and production build | Passed. |
-| Unit and integration | **223 tests passed**, including real HTTP/MCP, grounded read interpretation, context freshness/isolation, direct drafts, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
-| Browser workflows | **128/128 complete desktop/mobile checks passed in 10.8 minutes**, with no failures, skips or retries. Coverage includes all five fictional personas, conversation persistence/context freshness, approvals, speech recovery, exports, accessibility and case isolation. Earlier attempts are retained in the guide. |
+| Unit and integration | **227 tests passed**, including real HTTP/MCP, grounded reads, context isolation, approval, reply review, export integrity and UTC-offset chronology. Test files run sequentially; explicit concurrency checks remain covered. |
+| Browser workflows | Latest complete run: **123/130 passed**, with seven timing/refresh failures. After QA resource cleanup, **14/14 focused desktop/mobile checks passed**, including every failed journey. No assertions or timeouts were relaxed. A new clean 130-check run is still pending; the earlier 128/128 pass and failed attempts remain in the guide. |
 | Actual local AI | A seven-step fictional API journey passed with three real Ollama read-interpretation calls, a contextual MCP draft and redacted export. A separate real-model desktop draft review and mobile persisted conversation passed. These are not seven model calls or a general accuracy study. |
 | Accessibility and responsive layout | No automated violations in tested states. Keyboard focus, readable text, 44px header icon controls and desktop/mobile layout checks passed. |
+| Production container | A fresh Linux image and clean `npm ci` passed. Isolated checks verified non-root execution, authentication, real MCP, approval blocking, private-file exclusions and persistence after restart. The full Ollama/HTTPS Compose stack remains untested. |
+| Dependency audit | Patched the transitive `ip-address` advisory to 10.7.4. Production and full npm audits reported **zero known advisories** at check time; this is not a complete security assessment. |
 
 ```sh
 npm run check
@@ -237,9 +239,11 @@ Maya's full flow verifies receipt answered, authorization still open, stale
 approval blocked, a fresh reviewed follow-up and an exported history. These
 are scripted fictional personas, not recruited users or evidence of time saved.
 
-A real Ollama/MCP API and browser walkthrough completed on October 23 after
-the conversation changes. The latest changes have not had a fresh clean-install or
-complete Docker-stack verification. Detailed
+A real Ollama/MCP API journey was rerun after the chronology fix. Its first
+interpreted answer took 13.9 seconds end to end; the next two took 1.6-1.8
+seconds. These development timings do not guarantee responsiveness. A fresh
+production-container build and smoke test passed; a fresh host checkout and
+the complete Ollama/HTTPS Compose stack have not been verified. Detailed
 results, historical measurements and remaining work are in the
 [QA section of the project guide](docs/project-guide.md#4-testing-and-latest-results).
 
