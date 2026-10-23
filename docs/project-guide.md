@@ -494,7 +494,7 @@ single completion percentage across code, validation and submission.
 | Area | Current Evidence | Remaining Limit |
 | --- | --- | --- |
 | Tech Implementation | Six real Streamable HTTP MCP tools; persistence, reviewed writes, exact-message approval and exports; production build and 195/195 unit/integration tests pass. | Complex inference remains slow; native Alexa+, Bedrock and SMTP delivery are not live-verified. |
-| Design | 22/22 focused Edge checks pass on desktop/mobile in 3.9 minutes, including five fictional personas, loading recovery, appointment review, microphone feedback and reload protection. | Controlled transcripts are not physical microphone or screen-reader validation. The full browser suite was not completed. |
+| Design | 122/122 full Edge checks pass on desktop/mobile in 12.3 minutes, including five fictional personas, loading recovery, appointment review, microphone feedback and reload protection. | Controlled transcripts are not physical microphone or screen-reader validation. A reported misheard comparison still needs recovery work. |
 | Potential Impact | Sourced coordination problem and a complete fictional case from conflicting reports to reviewed follow-up and export. | No independent user study, measured benefit versus notes/email, or evidence of shorter repairs. |
 | Quality of the Idea | Neutral cross-party records, source-backed questions and receipt-versus-authorization review form a coherent workflow. | Global uniqueness and a competition score are not established. |
 
@@ -512,8 +512,18 @@ denials and approval rules remain in place.
 waiting for its dialog to close. Its unchanged desktop/mobile tests passed in
 the subsequent 22-check focused run. The trace showed a pending action request;
 that timeout's root cause is not conclusively established or proved to be the
-watcher bug. No complete 120/122-test pass is claimed. The focused JSON report is
-in ignored `.data/verification/browser-focused-final-2026-10-23.json`.
+watcher bug. That interrupted attempt is not a pass. A subsequent complete
+**122/122-test run passed in 12.3 minutes**, with no failures, skips or retries.
+Its report is in ignored `.data/verification/browser-complete-2026-10-23.json`;
+the earlier focused report is `browser-focused-final-2026-10-23.json`.
+
+**Physical speech attempt:** the user reported an unmatched comparison. Its
+stored text was `Compare the. Issue and supplier. Reports.` rather than the
+intended supplier/insurer comparison. No audio was inspected, so the acoustic
+cause and physical recognition accuracy are not established. The current local
+parser rejected it without changing repair records. Editing the transcript is
+the immediate workaround; safe punctuation handling and an explicit read-only
+clarification are the next narrowly scoped fix, not a redesign of Relay.
 
 **Current speed spot check:** ten exact draft commands across five fictional
 personas took **142-498 ms**, with model calls explicitly forbidden. Twenty

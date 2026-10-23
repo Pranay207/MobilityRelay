@@ -192,7 +192,7 @@ Windows, Node 24.11.0 and installed Microsoft Edge.
 | --- | --- |
 | TypeScript and production build | Passed. |
 | Unit and integration | **195 tests passed**, including real HTTP/MCP calls, direct drafts, bounded reads, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
-| Browser workflows | **22 focused desktop/mobile checks passed**, including five fictional-persona journeys, private-export reload protection, loading recovery, appointment review, branding and empty speech feedback. This is not a completed full-suite run; the earlier timeout and verification limits are recorded in the guide. |
+| Browser workflows | **122/122 full desktop/mobile checks passed** in 12.3 minutes, including five fictional-persona journeys, private-export reload protection, loading recovery, appointment review, branding and speech lifecycle checks. Physical recognition and independent usefulness remain unverified. Earlier failures are retained in the guide. |
 | Accessibility and responsive layout | No automated violations in tested states. Keyboard focus, readable text, 44px header icon controls and desktop/mobile layout checks passed. |
 
 ```sh
