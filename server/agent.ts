@@ -7,7 +7,7 @@ import type { ToolCaller } from './mcp.js';
 import { mcpCatalog } from './mcp.js';
 import { AppError } from './store.js';
 import { toolSchemas, type ToolName } from './schemas.js';
-import { commandText, directCaseCommand, localIntent, proposesTomorrow, proposeReply, proposeUpdate, reportCommand, requestQuestionKinds } from './intents.js';
+import { commandText, directCaseCommand, directDraftCommand, localIntent, proposesTomorrow, proposeReply, proposeUpdate, reportCommand, requestQuestionKinds } from './intents.js';
 import { ollamaConverse } from './ollama.js';
 
 export type { AgentReply } from '../shared/types.js';
@@ -46,6 +46,16 @@ export async function respond(input: { caseId: string; text: string; allowCloud:
   if (direct === 'export' || (config.agentMode === 'local' && intent === 'export')) {
     const packet = await call<AgentReply['packet']>('export_repair_packet', { caseId: input.caseId, format: 'html', redact: true }, traces);
     return { reply: 'Your redacted case history is ready. Review it for personal information before sharing it with your chosen advocate.', packet, traces };
+  }
+  const draftCommand = directDraftCommand(input.text);
+  if (draftCommand) {
+    const contacts = brief.contacts.filter(contact => contact.role === draftCommand.role);
+    const questions = brief.questions.filter(question => !question.resolved && (!draftCommand.kinds || draftCommand.kinds.includes(question.kind)));
+    if (!contacts.length) return { reply: 'Add the intended recipient in Contacts before preparing a request. Nothing has been sent.', traces };
+    if (!questions.length) return { reply: 'There is no matching open question for that request. Review the current evidence before preparing a different request. Nothing has been sent.', traces };
+    if (contacts.length !== 1) return { reply: 'More than one recipient matches. Select the intended contact and questions in the request form. Nothing has been sent.', action: 'prepare', traces };
+    const draft = await call<Draft>('prepare_repair_request', { caseId: input.caseId, requestId: randomUUID(), recipientId: contacts[0].id, questionIds: questions.map(question => question.id) }, traces);
+    return { reply: `A source-backed request to ${contacts[0].name} is ready for review. Nothing has been sent; only your explicit approval can capture or send it.`, draftId: draft.id, traces };
   }
   if (config.agentMode !== 'local') {
     if (config.agentMode === 'bedrock' && !input.allowCloud) throw new AppError('Consent is required before sharing case text with Amazon Bedrock.', 403);

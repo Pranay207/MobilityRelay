@@ -67,7 +67,7 @@ for (const mode of ['local', 'bedrock', 'ollama'] as const) test(`${mode} HTTP c
         assert.deepEqual(reply.traces.map(trace => trace.tool), ['get_repair_brief', 'export_repair_packet']);
       } else { assert.ok(reply.reply.startsWith(before.reportedStage)); assert.deepEqual(reply.traces.map(trace => trace.tool), ['get_repair_brief']); }
     }
-    if (mode === 'bedrock') for (const text of ['Why is that?', 'Show my case status and remind me tomorrow', 'Export my case history as JSON', 'Prepare a request to the supplier']) {
+    if (mode === 'bedrock') for (const text of ['Why is that?', 'Show my case status and remind me tomorrow', 'Export my case history as JSON', 'Prepare a detailed request to the supplier']) {
       const response = await ask(text); assert.equal(response.status, 403); assert.match((await response.json()).error, /Consent/);
     }
     const reports = await ask('Compare the supplier and insurer reports'); assert.equal(reports.status, 200);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import type { ConverseCommandOutput, Message } from '@aws-sdk/client-bedrock-runtime';
 import { respond, type AgentDependencies } from '../server/agent.js';
-import { directCaseCommand, localIntent, proposeUpdate, proposesTomorrow, reportCommand } from '../server/intents.js';
+import { directCaseCommand, directDraftCommand, localIntent, proposeUpdate, proposesTomorrow, reportCommand } from '../server/intents.js';
 import { Store, AppError } from '../server/store.js';
 import { RepairService } from '../server/service.js';
 import type { Config } from '../server/config.js';
@@ -26,7 +26,7 @@ function setup() {
   };
   const local = (text: string) => respond({ caseId: c.id, text, allowCloud: false }, config, call, 'http://unused.test/mcp');
   const catalog: NonNullable<AgentDependencies['catalog']> = async () => ['get_repair_brief', 'prepare_repair_request', 'manage_repair_followup', 'export_repair_packet', 'send_approved_request', 'record_repair_event'].map(name => ({ name, inputSchema: { type: 'object' as const, properties: {}, required: [] } }));
-  const cloud = (converse: NonNullable<AgentDependencies['converse']>, allowCloud = true, text = 'Prepare a request to the supplier') => respond({ caseId: c.id, text, allowCloud }, { ...config, agentMode: 'bedrock' }, call, 'http://unused.test/mcp', { converse, catalog });
+  const cloud = (converse: NonNullable<AgentDependencies['converse']>, allowCloud = true, text = 'Prepare a detailed request to the supplier') => respond({ caseId: c.id, text, allowCloud }, { ...config, agentMode: 'bedrock' }, call, 'http://unused.test/mcp', { converse, catalog });
   return { store, c, contact, call, local, cloud, catalog };
 }
 
@@ -38,6 +38,45 @@ test('report queries match a complete read, never negated, compound or speculati
   assert.equal(reportCommand('Compare the supplier and insurer reports'), 'both');
   assert.equal(reportCommand('Read the reports from both sides'), 'both');
   for (const text of ['Do not read the supplier report', 'What did the supplier say and send it?', 'Compare the supplier and insurer reports and blame the insurer', 'What will the insurer say?', 'Show the insurer report without redaction']) assert.equal(reportCommand(text), null);
+});
+
+test('direct drafts match only a complete recipient and supported topic, never extra instructions', () => {
+  assert.deepEqual(directDraftCommand('Relay, please prepare a request to the supplier asking for the missing estimate reference.'), { role: 'supplier', kinds: ['receipt', 'paperwork'] });
+  assert.deepEqual(directDraftCommand('Draft a follow-up to my insurer about authorization status'), { role: 'insurer', kinds: ['approval'] });
+  assert.deepEqual(directDraftCommand('Write a message to the supplier about temporary equipment'), { role: 'supplier', kinds: ['loaner'] });
+  assert.deepEqual(directDraftCommand('Prepare a request to the supplier'), { role: 'supplier', kinds: null });
+  for (const text of ['Do not prepare a request to the supplier', 'Prepare a request to the supplier and send it', 'Prepare a request to the supplier about parts arrival and remind me tomorrow', 'Prepare a request to the supplier named John', 'Prepare a request to the supplier about legal deadlines', 'Prepare a request to the supplier without sources', 'Prepare a request to the insurer about toString', 'Prepare a detailed request to the supplier']) assert.equal(directDraftCommand(text), null);
+});
+
+for (const mode of ['local', 'bedrock', 'ollama'] as const) test(`${mode} explicit drafts use fresh MCP without waiting for a model or approving delivery`, async () => {
+  const s = setup();
+  const ask = (text: string) => respond({ caseId: s.c.id, text, allowCloud: false }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', {
+    converse: async () => { throw new Error('Exact draft commands must not call a model.'); },
+    catalog: async () => { throw new Error('Exact draft commands must not discover model tools.'); },
+  });
+  try {
+    const reply = await ask('Prepare a request to the supplier about parts arrival');
+    assert.ok(reply.draftId); assert.match(reply.reply, /explicit approval/);
+    assert.deepEqual(reply.traces.map(t => t.tool), ['get_repair_brief', 'prepare_repair_request']);
+    const draft = s.store.get<Draft>('draft', reply.draftId, s.c.id);
+    assert.equal(draft.status, 'draft'); assert.equal(draft.recipientId, s.contact.id); assert.match(draft.body, /The part is delayed/);
+    assert.equal((await ask('Prepare a request to the supplier about authorization status')).draftId, undefined);
+    assert.equal((await ask('Prepare a request to the insurer')).draftId, undefined);
+    s.store.saveContact({ ...s.contact, id: undefined, name: 'Second fictional supplier', email: 'second@example.invalid' });
+    assert.equal((await ask('Prepare a request to the supplier')).action, 'prepare');
+    assert.equal(s.store.brief(s.c.id).drafts.length, 1); assert.equal(s.store.brief(s.c.id).events.length, 1);
+  } finally { s.store.close(); }
+});
+
+test('a failed direct draft is not retried or replaced by a model success', async () => {
+  const s = setup(); let attempts = 0;
+  try {
+    await assert.rejects(respond({ caseId: s.c.id, text: 'Prepare a request to the supplier', allowCloud: false }, { ...config, agentMode: 'ollama' }, async (name, args, traces) => {
+      if (name === 'prepare_repair_request') { attempts++; throw new AppError('Fictional MCP write failed.'); }
+      return s.call(name, args, traces);
+    }, 'http://unused.test/mcp'), /MCP write failed/);
+    assert.equal(attempts, 1); assert.equal(s.store.brief(s.c.id).drafts.length, 0);
+  } finally { s.store.close(); }
 });
 
 for (const mode of ['local', 'bedrock', 'ollama'] as const) test(`${mode} reads current attributed reports without model guesses or writes`, async () => {
@@ -338,7 +377,7 @@ for (const mode of ['bedrock', 'ollama'] as const) test(`${mode} draft selection
   const s = setup(); let turns = 0;
   try {
     s.store.recordEvent({ caseId: s.c.id, requestId: randomUUID(), party: 'supplier', source: 'Source with private detail', channel: 'Email', text: 'PRIVATE_FULL_REPORT: the part is delayed.', stage: 'parts_delayed', occurredAt: new Date().toISOString(), reference: '', supersedesId: null });
-    const result = await respond({ caseId: s.c.id, text: 'Prepare a request to the supplier about parts arrival', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
+    const result = await respond({ caseId: s.c.id, text: 'Prepare a detailed request to the supplier about parts arrival', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
       turns++;
       assert.equal(JSON.stringify(request.messages).includes('PRIVATE_FULL_REPORT'), false);
       assert.match(JSON.stringify(request.messages), /C1/); assert.match(JSON.stringify(request.messages), /Q1/);
@@ -407,7 +446,7 @@ for (const mode of ['bedrock', 'ollama'] as const) {
     const s = setup(); let turn = 0;
     try {
       s.store.recordEvent({ caseId: s.c.id, requestId: randomUUID(), party: 'user', source: 'Test user', channel: 'Personal note', text: 'Temporary equipment requested.', stage: 'loaner_needed', occurredAt: new Date().toISOString(), reference: '', supersedesId: null });
-      const result = await respond({ caseId: s.c.id, text: 'Prepare a request to the supplier about parts arrival', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
+      const result = await respond({ caseId: s.c.id, text: 'Prepare a detailed request to the supplier about parts arrival', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
         const schema = request.toolConfig!.tools!.find(tool => tool.toolSpec?.name === 'prepare_repair_request')!.toolSpec!.inputSchema!.json as { properties: { recipientId: { enum: string[] }; questionIds: { items: { enum: string[] } } } };
         assert.deepEqual(schema.properties.recipientId.enum, ['C1']); assert.deepEqual(schema.properties.questionIds.items.enum, ['Q1']);
         return ++turn === 1 ? output([{ toolUse: { toolUseId: 'draft', name: 'prepare_repair_request', input: { recipientId: 'C1', questionIds: ['Q1'] } } }]) : output([{ text: 'Ready.' }]);
@@ -419,7 +458,7 @@ for (const mode of ['bedrock', 'ollama'] as const) {
   test(`${mode} rejects unknown or cross-case model references`, async () => {
     const s = setup(); let turn = 0;
     try {
-      const result = await respond({ caseId: s.c.id, text: 'Prepare a request to the supplier', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async () => ++turn === 1 ? output([{ toolUse: { toolUseId: 'bad', name: 'prepare_repair_request', input: { recipientId: randomUUID(), questionIds: ['Q99'] } } }]) : output([{ text: 'Prepared.' }]) });
+      const result = await respond({ caseId: s.c.id, text: 'Prepare a detailed request to the supplier', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async () => ++turn === 1 ? output([{ toolUse: { toolUseId: 'bad', name: 'prepare_repair_request', input: { recipientId: randomUUID(), questionIds: ['Q99'] } } }]) : output([{ text: 'Prepared.' }]) });
       assert.equal(result.draftId, undefined); assert.equal(s.store.list<Draft>('draft', s.c.id).length, 0); assert.deepEqual(result.traces.map(trace => trace.tool), ['get_repair_brief']); assert.match(result.reply, /not completed/);
     } finally { s.store.close(); }
   });
@@ -427,7 +466,7 @@ for (const mode of ['bedrock', 'ollama'] as const) {
   test(`${mode} cannot introduce unsourced wording into a source-backed draft`, async () => {
     const s = setup(); let turn = 0;
     try {
-      const result = await respond({ caseId: s.c.id, text: 'Prepare a request to the supplier', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
+      const result = await respond({ caseId: s.c.id, text: 'Prepare a detailed request to the supplier', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async request => {
         const schema = request.toolConfig?.tools?.find(tool => tool.toolSpec?.name === 'prepare_repair_request')?.toolSpec?.inputSchema?.json as { properties?: Record<string, unknown> };
         assert.equal(schema.properties?.body, undefined); assert.equal(schema.properties?.subject, undefined);
         return ++turn === 1 ? output([{ toolUse: { toolUseId: 'draft', name: 'prepare_repair_request', input: { recipientId: s.contact.id, questionIds: [s.store.brief(s.c.id).questions[0].id], body: 'PRIVATE_MODEL_CLAIM: coverage was approved', subject: 'PRIVATE_MODEL_CLAIM' } } }]) : output([{ text: 'The email was sent automatically and the repair is resolved.' }]);
@@ -441,7 +480,7 @@ for (const mode of ['bedrock', 'ollama'] as const) {
   test(`${mode} cannot narrate a successful action without an accepted MCP write`, async () => {
     const s = setup();
     try {
-      const result = await respond({ caseId: s.c.id, text: 'Prepare a request to the supplier', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async () => output([{ text: 'Your email was sent and the case is complete.' }]) });
+      const result = await respond({ caseId: s.c.id, text: 'Prepare a detailed request to the supplier', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async () => output([{ text: 'Your email was sent and the case is complete.' }]) });
       assert.match(result.reply, /not completed through MCP/); assert.equal(s.store.list<Draft>('draft', s.c.id).length, 0); assert.equal(result.draftId, undefined);
     } finally { s.store.close(); }
   });

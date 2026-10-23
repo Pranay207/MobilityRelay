@@ -23,6 +23,24 @@ export function directCaseCommand(input: string): 'read' | 'export' | null {
   return null;
 }
 
+export function directDraftCommand(input: string): { role: 'supplier' | 'insurer'; kinds: string[] | null } | null {
+  const text = commandText(input).replace(/[.!?]+$/, '').trim().replace(/\s+/g, ' ');
+  const match = /^(?:prepare|draft|write) (?:a |the |my )?(?:request|message|follow[- ]?up) to (?:the |my )?(supplier|insurer)(?: (?:about|asking for|asking about) (?:the |my )?(.+))?$/i.exec(text);
+  if (!match) return null;
+  const topics: Record<string, string[]> = {
+    'missing estimate reference': ['receipt', 'paperwork'], 'estimate reference': ['receipt', 'paperwork'],
+    'estimate receipt': ['receipt', 'paperwork'], 'paperwork receipt': ['receipt', 'paperwork'], paperwork: ['receipt', 'paperwork'],
+    'parts arrival': ['parts'], 'parts availability': ['parts'],
+    authorization: ['approval'], 'authorization status': ['approval'],
+    'appointment time': ['appointment'], 'visit readiness': ['visit_readiness'],
+    'temporary equipment': ['loaner'], loaner: ['loaner'],
+    'coverage refusal': ['coverage'], assessment: ['assessment', 'technician'], response: ['response'],
+  };
+  const topic = match[2]?.toLowerCase();
+  if (topic && !Object.hasOwn(topics, topic)) return null;
+  return { role: match[1].toLowerCase() as 'supplier' | 'insurer', kinds: topic ? topics[topic] : null };
+}
+
 export function localIntent(input: string): 'blocked' | 'read' | 'record' | 'reply' | 'send' | 'export' | 'reminder' | 'draft' | 'unknown' {
   const text = commandText(input);
   if (/^(?:don't|do not|not|no|never|stop|cancel)\b/i.test(text)) return 'blocked';
