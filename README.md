@@ -22,10 +22,26 @@ reviewed follow-ups and share the case history without assigning blame.
 Built for the **Alexa+ track** of the Amazon Developer Hackathon as an independent
 **Alexa+ experience simulator**, using **Streamable HTTP**.
 
-[Demo Script](docs/project-guide.md#6-demo-script-target-245) |
+[Demo Video](#demo-video) |
 [Quick Start](#quick-start) | [Architecture](#mcp-integration) |
 [Verified Results](#verification) |
 [Project Guide](docs/project-guide.md)
+
+## Demo Video
+
+**YouTube walkthrough:** Link will be added after upload.
+
+The planned **2:45 English demo** follows Maya's fictional repair case.
+
+| Planned time | What the walkthrough demonstrates |
+| --- | --- |
+| `0:00-0:35` | Conflicting supplier/insurer reports, dated sources and real MCP calls. |
+| `0:35-0:55` | A contextual, source-backed request prepared for review. |
+| `0:55-1:40` | A reviewed reply confirms receipt while authorization remains unanswered. |
+| `1:40-2:20` | Stale approval is blocked; a fresh request is approved into local capture, followed by a saved due item. |
+| `2:20-2:45` | Redacted history export and the scope of the six-tool MCP workflow. |
+
+[Full recording script](docs/project-guide.md#6-demo-script-target-245).
 
 ## Product Preview
 
