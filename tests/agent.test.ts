@@ -436,7 +436,7 @@ test('an empty model reply is a recoverable failure, not a blank success', async
   finally { s.store.close(); }
 });
 
-for (const mode of ['bedrock', 'ollama'] as const) test(`${mode} renders read replies from the latest MCP brief, not model outcome predictions`, async () => {
+for (const mode of ['bedrock', 'ollama'] as const) test(`${mode} renders a selected read from the latest MCP brief after a tool refresh`, async () => {
   const s = setup(); let turns = 0;
   try {
     const result = await respond({ caseId: s.c.id, text: 'Help me compare the most recent repair reports.', allowCloud: true }, { ...config, agentMode: mode }, s.call, 'http://unused.test/mcp', { catalog: s.catalog, converse: async () => {
@@ -444,7 +444,7 @@ for (const mode of ['bedrock', 'ollama'] as const) test(`${mode} renders read re
         s.store.recordEvent({ caseId: s.c.id, requestId: randomUUID(), party: 'insurer', source: 'Fictional insurer update', channel: 'Email', occurredAt: new Date().toISOString(), text: 'The insurer reports that coverage was refused.', stage: 'coverage_refused', reference: '', supersedesId: null });
         return output([{ toolUse: { toolUseId: 'latest', name: 'get_repair_brief', input: {} } }]);
       }
-      return output([{ text: 'UNSUPPORTED_OUTCOME: Once the receipt is received, the insurer will approve the repair.' }]);
+      return output([{ text: '{"view":"next_step"}' }]);
     } });
     const latest = s.store.brief(s.c.id);
     assert.equal(turns, 2); assert.ok(result.reply.startsWith(latest.reportedStage)); assert.ok(result.reply.includes(latest.nextStep));
@@ -560,8 +560,10 @@ for (const mode of ['bedrock', 'ollama'] as const) {
         assert.equal(payload.includes('PRIVATE_REVIEWED_DRAFT_BODY'), false); assert.equal(payload.includes(s.contact.email), false); assert.equal(payload.includes('The part is delayed.'), false);
         if (++turn === 1) {
           const text = request.messages![0].content![0].text!;
-          const data = JSON.parse(text.slice(text.indexOf(': ') + 2, text.indexOf('\nUNTRUSTED conversation'))) as { events: { text: string; textTruncated: boolean }[]; omitted: { events: number }; requests: { status: string }[] };
-          assert.equal(data.events.length, 12); assert.equal(data.omitted.events, 9); assert.ok(data.events.every(event => event.text.length <= 1200)); assert.ok(data.events.some(event => event.textTruncated)); assert.equal(data.requests[0].status, 'draft');
+          const data = JSON.parse(text.slice(text.indexOf(': ') + 2, text.indexOf('\nUNTRUSTED conversation'))) as { events?: unknown; requests?: unknown; reportParties: string[]; questions: { id: string; title: string; kind: string }[]; omitted: { events: number } };
+          assert.equal(data.events, undefined); assert.equal(data.requests, undefined); assert.equal(data.omitted.events, 9);
+          assert.ok(data.reportParties.includes('user')); assert.ok(data.questions.length <= 15); assert.ok(data.questions.every(question => /^Q\d+$/.test(question.id)));
+          assert.equal(payload.includes('LONG_CURRENT_SOURCE'), false);
           return output([{ toolUse: { toolUseId: 'brief', name: 'get_repair_brief', input: {} } }]);
         }
         assert.match(payload, /textTruncated/); return output([{ text: 'Review the attributed current sources; the summary is incomplete.' }]);

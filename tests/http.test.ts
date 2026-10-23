@@ -86,7 +86,14 @@ for (const mode of ['local', 'bedrock', 'ollama'] as const) test(`${mode} HTTP c
     }
     const history = await (await fetch(`${running.url}/api/cases/${repair.id}/chat`, { headers })).json() as ChatMessage[];
     assert.equal(history.at(-1)?.text, comparison.reply); assert.equal(history.at(-1)?.spokenText, comparison.spokenText);
+    assert.equal(history.at(-1)?.focus?.view, 'comparison'); assert.equal(history.at(-1)?.focus?.caseVersion, before.repairCase.version);
     assert.deepEqual(running.store.brief(repair.id), before);
+    const followup = await ask('Ask the supplier for that reference.'); assert.equal(followup.status, 200);
+    const draftReply = await followup.json() as AgentReply; assert.ok(draftReply.draftId);
+    const after = running.store.brief(repair.id); const draft = after.drafts.find(item => item.id === draftReply.draftId)!;
+    assert.equal(draft.status, 'draft'); assert.deepEqual(draft.questionIds, [comparison.focus?.questionId]);
+    assert.equal(after.contacts.find(contact => contact.id === draft.recipientId)?.role, 'supplier');
+    assert.equal(after.events.length, before.events.length); assert.equal(after.followups.length, before.followups.length);
   } finally { await running.close(); }
 });
 

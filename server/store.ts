@@ -161,8 +161,8 @@ export class Store {
     const last = this.activeEvents(caseId).findLast(event => event.stage !== 'other');
     return { repairCase, events, questions, contacts: this.list('contact', caseId), drafts: this.list('draft', caseId), followups: this.list('followup', caseId), reportedStage: last ? stageLabels[last.stage] : 'Awaiting first update', nextStep: questions.find(q => !q.resolved)?.title ?? 'Record the next update or review the case history.' };
   }
-  chat(caseId: string, role: ChatMessage['role'], text: string, traces: ChatMessage['traces'] = [], spokenText?: string, suggestedCommand?: ChatMessage['suggestedCommand']): ChatMessage {
-    const message = { id: randomUUID(), caseId, role, text, traces, ...(spokenText ? { spokenText } : {}), ...(suggestedCommand ? { suggestedCommand } : {}), createdAt: now() }; this.put('chat', message); return message;
+  chat(caseId: string, role: ChatMessage['role'], text: string, traces: ChatMessage['traces'] = [], spokenText?: string, suggestedCommand?: ChatMessage['suggestedCommand'], focus?: ChatMessage['focus']): ChatMessage {
+    const message = { id: randomUUID(), caseId, role, text, traces, ...(spokenText ? { spokenText } : {}), ...(suggestedCommand ? { suggestedCommand } : {}), ...(focus ? { focus } : {}), createdAt: now() }; this.put('chat', message); return message;
   }
   deleteCase(id: string) { this.case(id); this.db.prepare('DELETE FROM cases WHERE id=?').run(id); }
 }

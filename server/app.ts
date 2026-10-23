@@ -150,7 +150,7 @@ export async function startServer(config: Config, mail: MailDelivery, options: {
     const history = store.list<ChatMessage>('chat', input.caseId).slice(-6);
     store.chat(input.caseId, 'user', input.text);
     const result = await respond({ ...input, history }, config, call, `${localOrigin}/mcp`, { catalog: () => mcp.catalog() });
-    store.chat(input.caseId, 'assistant', result.reply, result.traces, result.spokenText, result.suggestedCommand); res.json(result);
+    store.chat(input.caseId, 'assistant', result.reply, result.traces, result.spokenText, result.suggestedCommand, result.focus); res.json(result);
   });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found.' }));
   let vite: Awaited<ReturnType<typeof import('vite').createServer>> | undefined;

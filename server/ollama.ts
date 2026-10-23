@@ -56,17 +56,18 @@ async function boundedJson(response: Response) {
   } finally { reader.releaseLock(); }
 }
 
-export function ollamaConverse(baseUrl: string, model: string, request: typeof fetch = fetch) {
+export function ollamaConverse(baseUrl: string, model: string, request: typeof fetch = fetch, format?: Record<string, unknown>) {
   const endpoint = `${localModelEndpoint(baseUrl)}/api/chat`; localModelName(model);
   return async (input: ConverseCommandInput, signal: AbortSignal): Promise<ConverseCommandOutput> => {
     const tools = input.toolConfig?.tools?.flatMap(tool => tool.toolSpec ? [{ type: 'function', function: { name: tool.toolSpec.name, description: tool.toolSpec.description, parameters: tool.toolSpec.inputSchema?.json } }] : []) ?? [];
     const response = await request(endpoint, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal, redirect: 'error',
-      body: JSON.stringify({ model, messages: localMessages(input), tools, stream: false, think: false, keep_alive: '5m', options: { temperature: input.inferenceConfig?.temperature ?? 0.1, num_predict: Math.min(input.inferenceConfig?.maxTokens ?? 384, 384), num_ctx: 8192 } }),
+      body: JSON.stringify({ model, messages: localMessages(input), ...(format ? { format } : { tools }), stream: false, think: false, keep_alive: '5m', options: { temperature: format ? 0 : input.inferenceConfig?.temperature ?? 0.1, num_predict: Math.min(input.inferenceConfig?.maxTokens ?? 384, format ? 96 : 384), num_ctx: 8192 } }),
     });
     if (!response.ok) { await response.body?.cancel(); throw new Error(`Local model request failed (${response.status}).`); }
     const data = chatResponse.parse(await boundedJson(response));
     if (data.done_reason === 'length') throw new Error('The local model response was truncated.');
+    if (format && data.message.tool_calls?.length) throw new Error('A structured read selection must not request a model tool call.');
     const content: NonNullable<Message['content']> = [];
     const endOfThinking = data.message.content.lastIndexOf('</think>');
     const text = (endOfThinking >= 0 ? data.message.content.slice(endOfThinking + '</think>'.length) : data.message.content).trim();

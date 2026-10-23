@@ -20,6 +20,21 @@ export function needsReportClarification(input: string) {
   return /^compare (?:the |my )?(?:(?:issue|insurance|insure) and supplier|supplier and (?:issue|insurance|insure)) (?:reports|updates)$/i.test(reportText(input));
 }
 
+export function questionCommand(input: string): string[] | null {
+  const text = reportText(input);
+  if (/^(?:why (?:does|is) (?:the |that )?(?:receipt|submission|estimate) reference (?:matter|important)|why do we need (?:the |that )?(?:receipt|submission|estimate)?\s*reference)$/i.test(text)) return ['receipt', 'paperwork'];
+  if (/^what is (?:blocking|holding up) (?:the |my )?(?:authorization|approval)$/i.test(text)) return ['approval'];
+  return null;
+}
+
+export function contextualDraftCommand(input: string): { role: 'supplier' | 'insurer'; reference: boolean } | null {
+  const text = commandText(input).replace(/[.!?]+$/, '').trim().replace(/\s+/g, ' ');
+  const reference = /^ask (?:the |my )?(supplier|insurer) for that (?:(?:receipt|submission|estimate) )?reference$/i.exec(text);
+  if (reference) return { role: reference[1].toLowerCase() as 'supplier' | 'insurer', reference: true };
+  const question = /^(?:prepare|draft|write) (?:a |the |my )?(?:request|message|follow[- ]?up) to (?:the |my )?(supplier|insurer) about that (?:question|issue)$/i.exec(text);
+  return question ? { role: question[1].toLowerCase() as 'supplier' | 'insurer', reference: false } : null;
+}
+
 export function directCaseCommand(input: string): 'read' | 'export' | null {
   const text = commandText(input).replace(/[.!?]+$/, '').trim().replace(/\s+/g, ' ');
   if ([

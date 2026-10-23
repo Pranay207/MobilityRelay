@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import type { ConverseCommandInput } from '@aws-sdk/client-bedrock-runtime';
 import { localModelEndpoint, localModelName, ollamaConverse } from '../server/ollama.js';
+import { readSelectionJsonSchema } from '../server/conversation.js';
 
 const input: ConverseCommandInput = { modelId: 'unused', system: [{ text: 'Use recorded sources.' }], messages: [{ role: 'user', content: [{ text: 'What is missing?' }] }], toolConfig: { tools: [{ toolSpec: { name: 'get_repair_brief', description: 'Read the case', inputSchema: { json: { type: 'object', properties: {} } } } }] } };
 const reply = (content = 'The receipt reference is missing.', extra: Record<string, unknown> = {}) => ({ done: true, message: { role: 'assistant', content }, ...extra });
@@ -49,6 +50,17 @@ test('Ollama tool calls and results retain function names without exposing think
   await converse({ ...input, messages: [...input.messages!, first.output!.message!, { role: 'user', content: [{ toolResult: { toolUseId: use!.toolUseId!, status: 'success', content: [{ text: '{"nextStep":"Ask for receipt"}' }] } }] }] }, AbortSignal.timeout(5000));
   const messages = body.messages as { role: string; tool_name?: string; content: string }[];
   assert.equal(messages.at(-1)?.role, 'tool'); assert.equal(messages.at(-1)?.tool_name, 'get_repair_brief'); assert.match(messages.at(-1)!.content, /Ask for receipt/);
+});
+
+test('structured read interpretation supplies a schema, omits action tools and bounds output to a short selection', async () => {
+  const request: typeof fetch = async (_url, options) => {
+    const body = JSON.parse(String(options?.body)); assert.deepEqual(body.format, readSelectionJsonSchema);
+    assert.equal(body.tools, undefined); assert.deepEqual(body.options, { temperature: 0, num_predict: 96, num_ctx: 8192 });
+    return response(reply('{"view":"comparison"}'));
+  };
+  const result = await ollamaConverse('http://127.0.0.1:11434', 'qwen2.5:1.5b', request, readSelectionJsonSchema)(input, AbortSignal.timeout(5000));
+  assert.equal(result.output?.message?.content?.[0].text, '{"view":"comparison"}');
+  await assert.rejects(ollamaConverse('http://127.0.0.1:11434', 'qwen2.5:1.5b', async () => response(reply('', { message: { role: 'assistant', content: '', tool_calls: [{ function: { name: 'get_repair_brief', arguments: {} } }] } })), readSelectionJsonSchema)(input, AbortSignal.timeout(5000)), /must not request a model tool/);
 });
 
 test('Ollama rejects incomplete, truncated, malformed and empty responses', async () => {
