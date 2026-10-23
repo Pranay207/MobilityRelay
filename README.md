@@ -31,15 +31,19 @@ Built for the **Alexa+ track** of the Amazon Developer Hackathon as an independe
 
 **YouTube walkthrough:** Link will be added after upload.
 
-The planned **2:45 English demo** follows Maya's fictional repair case.
+The locally generated **2:57 English demo** follows Maya's fictional repair
+case, with computer-generated narration and captions. YouTube upload is pending.
 
-| Planned time | What the walkthrough demonstrates |
+| Approximate time | What the walkthrough demonstrates |
 | --- | --- |
-| `0:00-0:35` | Conflicting supplier/insurer reports, dated sources and real MCP calls. |
-| `0:35-0:55` | A contextual, source-backed request prepared for review. |
-| `0:55-1:40` | A reviewed reply confirms receipt while authorization remains unanswered. |
-| `1:40-2:20` | Stale approval is blocked; a fresh request is approved into local capture, followed by a saved due item. |
-| `2:20-2:45` | Redacted history export and the scope of the six-tool MCP workflow. |
+| `0:00-0:10` | The repair-coordination problem and project introduction. |
+| `0:10-0:34` | Conflicting reports, dated sources, actual Ollama interpretation and MCP calls. |
+| `0:34-0:49` | A contextual, source-backed request prepared for review. |
+| `0:49-1:30` | A reviewed reply confirms receipt while authorization remains unanswered. |
+| `1:30-2:09` | Stale approval is blocked; a fresh request receives explicit approval into local capture. |
+| `2:09-2:23` | A saved local due item survives reload. |
+| `2:23-2:43` | Redacted history export with sources and the remaining question. |
+| `2:43-2:57` | Six real tools, implementation summary and honest scope limits. |
 
 [Full recording script](docs/project-guide.md#6-demo-script-target-245).
 

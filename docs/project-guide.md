@@ -1889,6 +1889,56 @@ evidence map, not a winning probability or promise of full marks.
 
 ## 6. Demo Script: Target 2:45
 
+### Generated Cut: October 23
+
+A narrated local cut is now generated: **177.2 seconds (2:57.2), 1920x1080,
+H.264 video with stereo AAC audio, approximately 13 MB**. It has not been
+uploaded or submitted. Output files are intentionally ignored by Git:
+
+- `.data/demo-video-2026-10-23/MobilityRelay-demo-1080p.mp4`: captioned cut.
+- `.data/demo-video-2026-10-23/MobilityRelay-demo-narrated.mp4`: narration without burned captions.
+- `.data/demo-video-2026-10-23/captions.srt`: optional uploadable captions.
+- `.data/demo-video-2026-10-23/narration.txt`: the spoken text.
+- `.data/demo-video-2026-10-23/capture.json` and `video-report.json`: provenance and checks.
+
+`scripts/record-demo.ts` uses a separate in-memory seeded workspace and records
+actual Edge interactions. No existing user cases are modified. The capture
+asserted all six real MCP tools, one actual Ollama interpretation, receipt
+answered with authorization still open, one local capture and a persistent due
+item. It recorded zero application errors. Typed inputs are shown; no physical
+microphone recording or email delivery is implied.
+
+`scripts/render-demo.mjs` creates original title graphics, chapter headers,
+computer-generated English narration and captions. Startup pauses are trimmed
+and frames can be held; action footage is not sped up. The narrator is the
+installed Microsoft David Desktop voice, not a cloned person. Captions use
+estimated phrase timing and should be reviewed. There is no background music.
+
+Checks passed: TypeScript, JavaScript syntax, full FFmpeg decode, browser media
+metadata at 1920x1080 and under 180 seconds, and inspection of representative
+frames. Audio decoding passed with mean volume -21.7 dB and peak -4.1 dB. These
+machine checks do not replace the creator listening to the complete video or
+confirming the captions. They also do not establish independent user benefit.
+
+To reproduce on this Windows setup with Edge, System.Speech, and
+`qwen2.5:1.5b` already available in local Ollama:
+
+```powershell
+$env:DOTENV_CONFIG_PATH='NUL'
+$env:NODE_USE_SYSTEM_CA='1'
+npx playwright install ffmpeg
+npm install --prefix .data/demo-tools --no-save --package-lock=false ffmpeg-static@5.3.0
+node --import tsx scripts/record-demo.ts
+node scripts/render-demo.mjs
+```
+
+The encoder is separate ignored tooling, not a new application dependency.
+Before publishing, review the complete MP4 and upload it to a public YouTube
+or Vimeo URL. Replace the README's pending link and verify the submitted URL
+while signed out. No upload or submission is claimed by these local scripts.
+
+### Original 2:45 Recording Plan
+
 | Time | Show and say |
 | --- | --- |
 | 0:00-0:15 | Open Maya's labelled fictional case. "MobilityRelay is a simulated Alexa+ repair assistant with a real MCP server. The supplier reports sending an estimate; the insurer reports not locating it." |
@@ -1935,6 +1985,8 @@ positives, friction and whether we would use the tool again.
 | Undici and on-headers / HTTP | Owned dispatchers, cancellation and framing hooks support the tested transport. | Avoid creation-time deadlines and repeated client setup. Header-normalization source remains unknown. | Yes, with wire/reconnect/no-replay tests. |
 | Browser speech / optional voice | Added review, opt-in replies and text fallback; controlled callbacks pass tests. | Hardware/accuracy unverified; browser availability and vendor processing vary. | Yes as progressive enhancement, retaining forms/text. |
 | Playwright and axe / verification | Installed Edge supports desktop/mobile, keyboard, layout and accessibility checks. | Registry resolution needed a pin. Automated scans do not replace real assistive-technology/user tests. | Yes, with coverage limits disclosed. |
+| Playwright recording and FFmpeg / demo production | Captured real UI interactions, encoded a 1080p H.264/AAC cut and checked full decoding. Separate ignored encoder tooling kept application dependencies unchanged. | The recording binary was not initially installed. Caption timing is our estimated edit, not word alignment or an encoder defect. | Yes, with a complete playback review before publishing. |
+| Windows System.Speech / demo narration | Installed Microsoft David Desktop voice generated English WAV narration locally without API credentials. | Computer-generated delivery and estimated captions still need the creator's listening review. This is video narration, not evidence of working physical microphone input. | Yes for an explicitly labelled narrated cut. |
 | Docker and Compose / packaging | Built a non-root image; isolated production/MCP/volume checks pass. Shared namespace configuration preserves loopback access. | Container npm lacked host trust roots. A build-only CA secret fixed TLS. Full Ollama/TLS stack is untested. | Yes, with documented trust/network setup. |
 | Nodemailer / optional SMTP | Implemented TLS-required SMTP and distinct capture/provider states around reviewed messages. | No provider configured or live acceptance/receipt demonstrated. Capture is not delivery. | Yes for the adapter; test a controlled inbox first. |
 | Lucide / icons | Used familiar action icons with labels/tooltips. | No product defect reproduced; sizing/tap areas are our responsibility. | Yes for consistent controls. |
@@ -1970,6 +2022,7 @@ positives, friction and whether we would use the tool again.
 | Oct 23: application timestamp handling | String ordering of valid ISO timestamps with different UTC offsets selected the wrong stage or next follow-up. Source dates could be labelled UTC without conversion. | Compare instants consistently and normalize explicit UTC labels while preserving raw evidence and reviewed messages. Suggest offset-crossing and equal-instant fixtures, not just `Z` timestamps. | Four regressions failed before the fix and pass afterward; targeted real-MCP desktop/mobile checks passed 2/2. |
 | Oct 23: npm / transitive dependency | The current audit reported a moderate `ip-address@10.7.3` advisory. Registry TLS initially failed on this Windows host. | Updated the compatible transitive dependency to 10.7.4 and used Node system trust roots, keeping TLS verification enabled. Suggest separating environment trust errors from actual audit results. | Production and full npm audits then reported zero known advisories; [upstream advisory](https://github.com/advisories/GHSA-rxp7-6hxx-x8q5). This is not proof of complete security. |
 | Oct 23: application startup and review latency | A failed startup could look like an empty workspace. Read-only proposals waited for a redundant case read; one measured 4,583 ms. A controlled post-login failure also exposed an initialization race. | Explicit read-only recovery, one bounded GET connection retry and initialized-state gating; review-only proposals no longer reload unchanged case data. Fixture GETs allow one documented reset retry, never write replay. | Regression attempts and focused results are retained in the submission reliability section. The original connection-reset cause is not established; no unconditional smoothness claim. |
+| Oct 23: local demo recording/encoding setup | No FFmpeg was on PATH and Playwright's recording binary was absent. These were setup prerequisites, not reproduced product defects. | Installed Playwright FFmpeg and a separate `ffmpeg-static@5.3.0` encoder under ignored tooling. Suggest a recording preflight that checks the recorder and final export encoder separately. | Actual six-tool capture and final 177.2-second MP4 passed decoding/metadata checks; listening review and public upload remain separate. |
 | Pending: Bedrock | No real account/model-enabled run observed. | Record access, tool use, latency/cost only after a controlled live test. No live AWS qualification claimed. | Optional `server/agent.ts` adapter, not live evidence. |
 | Pending: SMTP provider | No real provider delivery test observed. | Keep capture labels; record TLS setup, acceptance/error and receipt separately after testing. | No provider feedback claimed yet. |
 
