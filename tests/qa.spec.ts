@@ -1,8 +1,28 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
 
 const viewTab = (page: Page, name: string) => page.getByRole('tab', { name: name === 'Requests' ? /^Requests(?: \d+)?$/ : name, exact: true });
+
+test('private verification exports never reload the workspace or discard unsent input', async ({ page }, info) => {
+  let connected = false;
+  page.on('websocket', socket => socket.on('framereceived', frame => { if (String(frame.payload).includes('"type":"connected"')) connected = true; }));
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  await expect.poll(() => connected).toBe(true);
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+  const input = page.getByRole('textbox', { name: 'Message to Relay', exact: true });
+  await input.fill('Unsent fictional question');
+  const path = `.data/verification/private-reload-${info.project.name}-${Date.now()}.html`;
+  await mkdir('.data/verification', { recursive: true });
+  // A bounded observation window tests the absence of a development reload.
+  const reloaded = page.waitForEvent('framenavigated', { predicate: frame => frame === page.mainFrame(), timeout: 2500 }).then(() => true, () => false);
+  try {
+    await writeFile(path, '<!doctype html><title>Fictional private verification export</title>');
+    expect(await reloaded).toBe(false);
+    await expect(input).toHaveValue('Unsent fictional question');
+  } finally { await unlink(path); }
+});
 
 test('startup fetches settings and cases together and displays the case before slow conversation history', async ({ page }) => {
   let settingsHeld = false; let casesRequested = false; let historyHeld = false;
@@ -35,6 +55,44 @@ test('a conversation-history failure leaves the loaded case visible and reports 
   await expect(page.getByRole('alert')).toContainText('Conversation history unavailable.');
   await page.getByRole('button', { name: 'Record update', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
+});
+
+test('initial selection uses its validated case list once and a failed case read can be retried without writes', async ({ page }) => {
+  let listings = 0; let attempts = 0; let writes = 0;
+  page.on('request', request => { const path = new URL(request.url()).pathname; if (path === '/api/cases' && request.method() === 'GET') listings++; if (request.method() === 'POST') writes++; });
+  await page.route(/\/api\/cases\/[^/]+$/, route => ++attempts === 1 ? route.fulfill({ status: 503, json: { error: 'Fictional case read unavailable.' } }) : route.continue());
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Case could not be loaded', exact: true })).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('Fictional case read unavailable');
+  await expect(page.getByRole('heading', { name: 'Loading case...', exact: true })).toHaveCount(0);
+  expect(listings).toBe(1); expect(attempts).toBe(1);
+  await page.getByRole('button', { name: 'Retry loading case', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  expect(listings).toBe(2); expect(attempts).toBe(2); expect(writes).toBe(0);
+});
+
+test('a stalled read times out and retry restores only the selected case', async ({ page }, info) => {
+  await page.addInitScript(() => {
+    const state = { stall: false }; Object.assign(window, { fictionalRead: state });
+    const timeout = AbortSignal.timeout.bind(AbortSignal); const originalFetch = window.fetch.bind(window);
+    AbortSignal.timeout = milliseconds => timeout(state.stall && milliseconds === 10000 ? 40 : milliseconds);
+    window.fetch = (input, init) => {
+      if (state.stall && /\/api\/cases\/[^/]+$/.test(String(input))) return new Promise((_resolve, reject) => {
+        if (init?.signal?.aborted) reject(init.signal.reason);
+        else init?.signal?.addEventListener('abort', () => reject(init.signal!.reason), { once: true });
+      });
+      return originalFetch(input, init);
+    };
+  });
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open case navigation', exact: true }).click();
+  await page.evaluate(() => { (window as unknown as { fictionalRead: { stall: boolean } }).fictionalRead.stall = true; });
+  await page.getByRole('button', { name: /Replacement caster delay Alex/ }).click();
+  await expect(page.getByRole('heading', { name: 'Case could not be loaded', exact: true })).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('workspace read timed out');
+  await page.evaluate(() => { (window as unknown as { fictionalRead: { stall: boolean } }).fictionalRead.stall = false; });
+  await page.getByRole('button', { name: 'Retry loading case', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Replacement caster delay', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toHaveCount(0);
 });
 
 test('compact assessment workspace keeps icon commands accessible and the empty conversation unclipped', async ({ page }, info) => {

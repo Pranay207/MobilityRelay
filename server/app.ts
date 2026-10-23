@@ -163,7 +163,8 @@ export async function startServer(config: Config, mail: MailDelivery, options: {
       const cacheKey = config.port ? createHash('sha256').update(`${config.dataDir}:${config.port}`).digest('hex').slice(0, 16) : randomBytes(6).toString('hex');
       const cacheDir = resolve('node_modules', '.vite', `mobilityrelay-${cacheKey}`);
       const deny = ['.env', '.env.*', '*.{crt,pem,key,p12,pfx,cer,der}', '.npmrc', '.yarnrc.yml', '**/.git/**', '**/.aws/**', '**/.private/**', '**/.data/**', `${normalizePath(resolve(config.dataDir))}/**`];
-      vite = await createVite({ cacheDir, publicDir: false, server: { middlewareMode: true, hmr: { server }, fs: { strict: true, deny } }, appType: 'spa' }); app.use(vite.middlewares);
+      const ignored = ['**/.data/**', '**/.private/**', '**/test-results/**', '**/playwright-report/**', `${normalizePath(resolve(config.dataDir))}/**`];
+      vite = await createVite({ cacheDir, publicDir: false, server: { middlewareMode: true, hmr: { server }, watch: { ignored }, fs: { strict: true, deny } }, appType: 'spa' }); app.use(vite.middlewares);
     }
   }
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
