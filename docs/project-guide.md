@@ -494,6 +494,9 @@ not establish the native toolkit's sub-500 ms query target.
 
 ## 4. Testing and Latest Results
 
+Backend unit/integration tests use Node.js's built-in `node:test` runner through
+`tsx`; browser workflows use Playwright with axe checks in covered states.
+
 ### Submission-Day Implementation Audit: October 23
 
 The current scope is a **working hackathon prototype**, not a production-ready

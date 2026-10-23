@@ -111,7 +111,15 @@ the reviewed forms; recording speech never submits it automatically.
 
 ## Quick Start
 
-Requires **Node.js 24+ and npm**. In a local checkout:
+Requires **Node.js 24+ and npm**.
+
+**Default mode uses a limited command interpreter, not an LLM.** Both modes
+call real MCP tools. For the model-assisted experience shown in the video,
+use [Local AI with Ollama](#local-ai-with-ollama).
+
+### Default Mode
+
+In a local checkout:
 
 ```sh
 npm ci
@@ -134,10 +142,9 @@ review-only draft using the current conversation context. Ambiguous or stale
 context opens a selection form instead of guessing. Nothing is approved or sent
 by voice. **Case brief** offers a button-based starting point.
 
-<details>
-<summary>Optional local AI with Ollama</summary>
+### Local AI with Ollama
 
-Install [Ollama](https://ollama.com/) separately, then run:
+Install and start [Ollama](https://ollama.com/) separately, then run:
 
 ```sh
 ollama pull qwen2.5:1.5b
@@ -146,9 +153,9 @@ npm run dev:ollama
 
 Open **http://127.0.0.1:4318**. This uses a separate fictional database and local
 message capture. The model interprets read requests into validated views; the
-host renders facts from current MCP records. Model weights download separately.
-
-</details>
+host renders facts from current MCP records. This is a bounded repair workflow,
+not a general-purpose assistant. Model weights download separately; CPU
+inference can take tens of seconds.
 
 See the [setup guide](docs/project-guide.md#2-run-the-project) for configuration,
 Windows instructions, Gmail testing and Docker.
@@ -188,23 +195,25 @@ send messages through the simulator. Approval is bound to the exact message and
 case version; writes are never automatically replayed after a connection failure.
 
 **Stack:** TypeScript, React, Vite, Lucide, Express, SQLite, the official MCP SDK
-and Zod. Optional adapters support Ollama, Amazon Bedrock and SMTP. Local mode is
-a limited command interpreter, not an LLM.
+and Zod, with optional Ollama, Amazon Bedrock and SMTP adapters.
 
 ## Verification
 
 Latest code verification: **October 23, 2026**, using isolated fictional data on
 Windows, Node 24.11.0 and installed Microsoft Edge.
 
+Backend tests use **Node.js's built-in test runner** through `tsx`; browser
+checks use **Playwright**.
+
 | Check | Recorded result |
 | --- | --- |
 | TypeScript and production build | Passed. |
-| Unit and integration | **231 passed**, including real HTTP/MCP, persistence, approval boundaries, reviewed replies, recovery and UTC-offset chronology. |
-| Browser workflows | **142/142 passed in 15.5 minutes**, desktop/mobile, with no failures, skips or whole-test retries. Read-only requests may retry one connection reset. |
-| Actual local AI | Seven-step fictional API journey passed, including three real Ollama inference calls. Separate desktop draft review and mobile persisted-conversation checks passed. |
-| Accessibility and layout | Keyboard focus and responsive checks passed; no automated accessibility violations in tested states. |
-| Production container | Earlier `c5696d6` Linux image passed clean build, non-root/auth/MCP/approval checks and restart persistence. Latest client changes have not had a fresh image test. |
-| Dependency audit | Production and full npm audits reported **zero known advisories** at check time; this is not a security certification. |
+| Unit and integration | **231 passed**: HTTP/MCP, persistence, reviewed actions, recovery and timestamp handling. |
+| Browser workflows | **142/142 passed in 15.5 minutes** across desktop/mobile; no failures, skips or whole-test retries. |
+| Actual local AI | Seven-step API journey with three Ollama inferences; desktop draft-review and mobile conversation-persistence checks passed. |
+| Accessibility and layout | Keyboard, responsive-layout and automated accessibility checks passed in tested states. |
+| Production container | Earlier `c5696d6` image passed build, non-root/auth/MCP/approval and restart-persistence checks; latest client changes have not had a fresh image test. |
+| Dependency audit | Production and full npm audits reported **zero known advisories** at check time. |
 
 ```sh
 npm run check
@@ -213,19 +222,20 @@ npm run test:browser
 npm run test:conversation
 ```
 
-Browser tests require installed Microsoft Edge. The fictional workflows cover
-paperwork, temporary equipment, unanswered requests, coverage and assessment.
-Full results, latency measurements, earlier failed attempts and fixes are in the
+Browser tests require installed Microsoft Edge. Read-only requests may retry
+one connection reset. Full results, coverage, latency measurements, earlier
+failed attempts and fixes are in the
 [QA section of the project guide](docs/project-guide.md#4-testing-and-latest-results).
 
 ## Current Status and Privacy
 
-- **Alexa+ simulator:** real MCP, but no native Alexa+ integration, connected inbox or live supplier/insurer systems.
-- **Local capture:** approved messages stay in the local outbox by default. SMTP and Bedrock adapters are not live-verified; follow-ups are local due items, not autonomous messages or background reminders.
-- **Optional AI:** local mode is a limited command interpreter. Ollama is tested on small fictional scenarios, not general accuracy; CPU inference can take tens of seconds. The full Ollama/HTTPS Compose stack and a fresh host checkout remain unverified.
-- **Fictional data only:** the shared prototype stores plaintext SQLite records. Browser speech may use a vendor service; export redaction is limited and needs review before sharing.
-- **Validation limits:** speech tests use controlled callbacks, not physical audio. Microphone accuracy, broad device support, public hosting, full accessibility conformance and independent user benefit are unverified.
-- **Coordination, not repair:** no diagnosis, coverage decisions, guaranteed response or evidence of shorter repairs. The app cannot supply missing parts or technicians.
+- **Integration:** independent Alexa+ simulator, not a native Alexa+ or live supplier/insurer integration. SMTP delivery and Bedrock are not live-verified.
+- **Actions:** approved messages are captured locally by default. Follow-ups are local due items, not autonomous messages or background reminders.
+- **Data:** use fictional records only. SQLite storage is plaintext; browser speech may use a vendor service. Review limited export redaction before sharing.
+- **Validation:** recorded checks do not establish general model accuracy, physical microphone accuracy, broad device support, full accessibility conformance or independent user benefit. Public hosting, a fresh host checkout and the full Ollama/HTTPS Compose stack remain unverified.
+- **Scope:** coordination, not diagnosis or coverage decisions. No guaranteed response or demonstrated reduction in repair time; the app cannot supply parts or technicians.
+
+Detailed evidence and limitations remain in the [Project Guide](docs/project-guide.md).
 
 ## Repository Guide
 
