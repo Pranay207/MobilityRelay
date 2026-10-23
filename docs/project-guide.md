@@ -1955,6 +1955,8 @@ The introduction cites [Worobey et al.'s repair study](https://experts.umn.edu/e
 cord injury reporting repairs, vendor noncompletion after contact was the most
 common reason for incomplete repairs. This supports the problem context, not
 MobilityRelay's effectiveness; it is not a prevalence claim about all users.
+The on-screen credit is shortened to "Source: Worobey et al., 2025."; the full
+reference and its scope remain here rather than crowding the video.
 
 The first cut made the stale-warning text visible but framed the disabled
 approval control poorly. The retake scrolls the actual disabled checkbox into

@@ -42,7 +42,7 @@ try {
     <h1 style="margin-top:26px;font-size:82px;line-height:1.16">When repair updates conflict,<br>know what to ask next.</h1>
     <p style="margin-top:48px;font-size:32px;color:#d6e4dd">Alexa+ experience simulator. Real MCP. User-reviewed actions.</p>
     <p style="margin-top:48px;font-size:24px;line-height:1.5;color:#d6e4dd">In a survey of 301 wheelchair users with spinal cord injury,<br>vendor noncompletion after contact was the most common reason for incomplete repairs.</p>
-    <p style="margin-top:12px;font-size:20px;color:#b4c9be">Worobey et al., 2025 / doi:10.1016/j.apmr.2024.10.001 / Problem evidence, not app-effectiveness evidence.</p>
+    <p style="margin-top:12px;font-size:20px;color:#b4c9be">Source: Worobey et al., 2025.</p>
     <p style="margin-top:42px;font-size:20px;color:#b4c9be">FICTIONAL WALKTHROUGH / TYPED CONVERSATION / COMPUTER-GENERATED NARRATION</p>
   </main>`);
   await page.screenshot({ path: join(directory, 'intro.png') });
