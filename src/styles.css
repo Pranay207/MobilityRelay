@@ -152,6 +152,7 @@ h1, h2, h3, p { margin-top: 0; }
 .message-author { font-size: 12px; color: #84a08b; font-weight: 600; }
 .message p { font-size: 14px; color: #54705e; line-height: 1.6; margin: 6px 0 0; white-space: pre-wrap; }
 .message.message-user p { color: var(--muted); }
+.message .clarification-action { margin-top: 8px; min-height: 44px; font-size: 14px; }
 .tool-trace { margin-top: 10px; border-top: 1px solid #e5ece5; padding-top: 7px; color: #8b9b90; font-size: 12px; }
 .tool-trace summary { display: flex; gap: 5px; align-items: center; cursor: pointer; font-size: 12px; }
 .tool-trace > div { display: flex; justify-content: space-between; gap: 10px; padding-top: 8px; font-family: ui-monospace, Consolas, monospace; }

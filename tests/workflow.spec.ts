@@ -81,6 +81,41 @@ test('specific report questions show dated sources and unsupported questions sta
   await page.screenshot({ path: `.data/screenshots/${info.project.name}-grounded-conversation.png`, fullPage: true });
 });
 
+test('misheard comparison preserves the transcript and requires an explicit read-only clarification after reload', async ({ page }, info) => {
+  const transcript = 'Compare the. Issue and supplier. Reports.';
+  await mockSpeech(page, { transcript });
+  let submitted = 0; let caseWrites = 0;
+  page.on('request', request => { const path = new URL(request.url()).pathname; if (request.method() === 'POST' && path === '/api/agent') submitted++; if (request.method() === 'POST' && (path === '/api/action' || path.endsWith('/send'))) caseWrites++; });
+  await page.request.get('/api/session');
+  const cases = await (await page.request.get('/api/cases')).json(); const repair = cases.find((item: { reference: string }) => item.reference === 'DEMO-1042');
+  const before = (await (await page.request.get(`/api/cases/${repair.id}`)).json()).data;
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+  await page.getByRole('button', { name: 'Start voice input', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Message to Relay' })).toHaveValue(transcript); expect(submitted).toBe(0);
+  const first = page.waitForResponse(response => response.url().endsWith('/api/agent') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  const clarification = await (await first).json(); expect(clarification.suggestedCommand).toBe('compare_reports');
+  const answer = page.getByRole('log').locator('.message-assistant').last();
+  await expect(answer).toContainText('Did you mean the supplier and insurer reports?');
+  await expect(answer).not.toContainText('Latest supplier report'); expect(submitted).toBe(1);
+  expect((await (await page.request.get(`/api/cases/${repair.id}`)).json()).data).toEqual(before);
+  await page.reload(); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+  await expect(page.getByRole('log').locator('.message-user').last()).toContainText(transcript);
+  const confirm = page.getByRole('log').locator('.message-assistant').last().getByRole('button', { name: 'Compare reports', exact: true });
+  await expect(confirm).toBeEnabled(); expect(submitted).toBe(1);
+  expect((await confirm.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await page.screenshot({ path: `.data/screenshots/${info.project.name}-comparison-clarification.png`, fullPage: true });
+  const second = page.waitForResponse(response => response.url().endsWith('/api/agent') && response.request().method() === 'POST');
+  await confirm.click(); const comparison = await (await second).json();
+  expect(comparison.suggestedCommand).toBeUndefined(); expect(comparison.traces.map((trace: { tool: string }) => trace.tool)).toEqual(['get_repair_brief']);
+  await expect(page.getByRole('log').locator('.message-assistant').last()).toContainText('Latest supplier report, Source');
+  await expect(page.getByRole('log').locator('.message-assistant').last()).toContainText('Latest insurer report, Source');
+  expect((await (await page.request.get(`/api/cases/${repair.id}`)).json()).data).toEqual(before);
+  expect(submitted).toBe(2); expect(caseWrites).toBe(0);
+});
+
 test('report playback uses short attributed situations while written quotations and MCP history remain', async ({ page }, info) => {
   await mockVoiceLifecycle(page);
   const session = await (await page.request.get('/api/session')).json(); const headers = { 'x-relay-csrf': session.csrf };
