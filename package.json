@@ -14,10 +14,12 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "test:browser": "playwright test",
+    "test:demo": "playwright test tests/demo-users.spec.ts",
     "test:ollama": "tsx scripts/verify-ollama.ts",
     "test:ollama:ui": "tsx scripts/verify-ollama-ui.ts",
     "test:container": "tsx scripts/verify-container.ts",
     "measure:usefulness": "tsx scripts/measure-usefulness.ts",
+    "measure:performance": "tsx scripts/verify-performance.ts",
     "mail:verify": "tsx scripts/verify-smtp.ts",
     "check": "npm run build && npm test"
   },
