@@ -503,7 +503,7 @@ single completion percentage across code, validation and submission.
 | Area | Current Evidence | Remaining Limit |
 | --- | --- | --- |
 | Tech Implementation | Six real Streamable HTTP MCP tools; persistence, reviewed writes, exact-message approval, grounded conversation and exports; production build and 231/231 unit/integration tests pass. Actual Ollama read interpretation, the six-tool workflow and an earlier fresh production-container baseline passed. | General model accuracy is not established; complex inference may be slow. The latest client patch has not had a fresh image test. Native Alexa+, Bedrock, SMTP delivery and the full Ollama/HTTPS Compose stack are not live-verified. |
-| Design | The latest pre-fix full Edge audit passed 127/130. Focused startup, review and post-login checks passed during the reliability fixes. Earlier full 128/128 and failed attempts remain below. | The complete 142-check post-fix run is pending. Connection-reset root cause is not conclusively isolated. Controlled speech is not physical microphone, screen-reader or independent usefulness validation. |
+| Design | The complete post-fix Edge audit passed 142/142 in 15.5 minutes across desktop and mobile, with no failures, skips or whole-test retries. Focused startup, review and post-login regressions also passed. Earlier failed attempts remain below. | Read-only requests may retry once; connection-reset root cause is not conclusively isolated. Controlled speech is not physical microphone, screen-reader or independent usefulness validation. |
 | Potential Impact | Sourced coordination problem and a complete fictional case from conflicting reports to reviewed follow-up and export. | No independent user study, measured benefit versus notes/email, or evidence of shorter repairs. |
 | Quality of the Idea | Neutral cross-party records, source-backed questions and receipt-versus-authorization review form a coherent workflow. | Global uniqueness and a competition score are not established. |
 
@@ -548,8 +548,20 @@ backend coverage. Reports:
 - `.data/verification/browser-post-login-recovery-2026-10-23.json` (failed attempt)
 - `.data/verification/browser-post-login-recovery-fixed-2026-10-23.json`
 
-The complete post-fix suite now contains **142 desktop/mobile checks**. Its
-complete rerun is pending; focused passes are not a clean full-suite claim.
+The complete post-fix suite passed **142/142 desktop/mobile checks in 15.5
+minutes** on commit `2e8916d`, with **zero failures, skips, flaky tests or runner
+errors**. Both projects had whole-test retries set to zero. The bounded
+read-request retries described above remain enabled; this is not a claim of
+zero network retries or a diagnosis of the original resets. Final report:
+`.data/verification/browser-submission-reliability-final-2026-10-23.json`.
+
+This run includes the full fictional case journey, all five fictional personas,
+startup and post-login recovery, reviewed replies, stale approvals, persistence,
+exports, keyboard focus, automated accessibility and controlled speech at
+desktop/mobile sizes. It does not establish physical microphone accuracy,
+independent user benefit, real email delivery or native Alexa+ access. The final
+production build also passed; log:
+`.data/verification/build-submission-reliability-final-2026-10-23.log`.
 
 ### End-to-End QA Audit: October 23
 
