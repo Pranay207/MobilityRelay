@@ -23,7 +23,7 @@ self-hosted MCP server. It is not a native Alexa+ skill or certified integration
 | What works now? | Case records, source-quoted reply review with before/after changes, unanswered questions, fresh source-backed drafts, exact-message approval, local capture, follow-ups and HTML/JSON export. |
 | Is MCP real? | Yes. The web host initializes, discovers and calls six tools over HTTP using the official MCP SDK. |
 | Is AI real? | Optional local Ollama inference has been tested. Default local mode is a limited command interpreter, not an LLM. |
-| What is not verified? | Native Alexa+, live Bedrock, real SMTP delivery, physical speech hardware, public hosting and independent user benefit. |
+| What is not verified? | Native Alexa+, live Bedrock, real SMTP delivery, physical microphone accuracy, broad audio/accessibility compatibility, public hosting and independent user benefit. The creator reported hearing a reply after the speaker fix; this is a narrow playback check. |
 | Does it guarantee a repair or a win? | No. It coordinates information; it cannot force an organisation to act. |
 
 ## 1. The Problem and Our Solution
@@ -419,10 +419,13 @@ No new cloud/model call, library, seventh MCP tool or automatic message is added
 - The model cannot record evidence or send messages. Follow-up tools may create only, not edit or cancel existing items.
 - Source-backed draft wording comes from the repair service, not arbitrary model-written subject/body claims.
 - Supported `Remind me tomorrow` / next-day commands use the existing 24-hour rule in every agent mode. They confirm only after a successful MCP write; no model or cloud consent is needed for this local operation.
-- Read context is bounded: six recent messages, up to 12 current sources, 15 open questions, ten contacts, five request statuses and eight follow-ups. Draft selection receives only scoped contacts/questions and omitted counts, not full reports or chat history; the service still uses the actual reports to produce the reviewed message. This is not a complete AI case audit.
+- Read interpretation initially receives only the reported stage, up to 15 open question references/titles/kinds, available report parties and omitted counts, not full source quotations or contact details. Up to six same-case messages, each capped at 500 characters, are included only for referential reads without an explicit topic; old conversations must not override a new question. Other bounded tool summaries can contain up to 12 current sources, ten contacts, five request statuses and eight follow-ups. Draft selection receives only scoped contacts/questions and omitted counts, not full reports or chat history; the service still uses actual reports to produce the reviewed message. This is not a complete AI case audit.
 - The loop allows at most five turns/eight attempted tools. Bedrock call/conversation limits are 25/45 seconds; Ollama limits are 90/150 seconds. These are bounds, not speed guarantees.
 - Equivalent writes share an idempotency key within a conversation. Provider failure does not silently switch modes or replay a write; a completed action retains its handle and trace.
 - The first successful requested action immediately returns its trusted host confirmation, without another inference pass or further actions from that model batch. Delivery status and read replies use recorded state: read text is rendered from the latest structured MCP brief, not model outcome predictions. This is a bounded case assistant, not open-ended factual Q&A; general model accuracy is not established.
+- `server/conversation.ts` validates read selections and renders the chosen reports, next step, saved follow-ups or an open question's explanation and dated sources. It never displays arbitrary model-written factual text. Ollama read interpretation uses `/api/chat` structured output with an explicit JSON schema and no model action tools; the actual MCP brief has already been read. Malformed/unknown selections ask for clarification. Bedrock's equivalent selection path is controlled-test-only, not live-verified.
+- Read replies persist a case-version-bound focus with a question reference. A complete command such as "Ask the supplier for that reference" or "Draft a request to the insurer about that question" can prepare only that still-open question for an explicit, uniquely matched recipient. Changed, missing, cross-case, unrelated or ambiguous context opens manual selection; it cannot grant approval, send, record evidence or create a reminder. Earlier chats without focus metadata require a fresh read.
+- Future-outcome questions about approval, arrival, responses or completion receive a deterministic limitation before inference. The assistant does not predict insurer or provider decisions.
 
 The UI ignores refresh results/errors superseded by a newer action, selection
 or refresh. This prevents a slow poll from hiding an already-saved reply or
@@ -462,8 +465,14 @@ keys, disables public-directory serving and keeps Vite caches outside case data.
 
 Speech is optional and text/forms remain available. Recognition is cancelled
 on submission, review, tab hiding, case switching and unmount; stale callbacks
-are ignored. Spoken replies are opt-in, do not replay history and stop at review
-boundaries. Browser recognition may use a vendor cloud even with local inference.
+are ignored. Spoken replies are opt-in. Enabling them explicitly reads the latest
+assistant reply and then new replies; loading history alone remains silent.
+Mute, recording, review boundaries and tab/case changes stop playback. Available
+English voices are preferred, paused synthesis is resumed, and browser-reported
+playback shows Speaking. If no start event arrives within six seconds, playback
+is cancelled and a retryable error appears. Browser start events do not prove
+that device volume is audible. Browser recognition may use a vendor cloud even
+with local inference.
 For latest supplier/insurer report reads and comparisons, optional `spokenText`
 contains a brief source/date/user-recorded situation and uncertainty warning.
 It is stored alongside the written conversation, not generated by an LLM.
@@ -493,10 +502,96 @@ single completion percentage across code, validation and submission.
 
 | Area | Current Evidence | Remaining Limit |
 | --- | --- | --- |
-| Tech Implementation | Six real Streamable HTTP MCP tools; persistence, reviewed writes, exact-message approval and exports; production build and 199/199 unit/integration tests pass. | Complex inference remains slow; native Alexa+, Bedrock and SMTP delivery are not live-verified. |
-| Design | 122/122 full Edge checks passed before the final speech-recovery change; 16/16 focused desktop/mobile regressions passed afterward in 1.5 minutes. | Controlled transcripts are not physical microphone or screen-reader validation. Physical recognition and independent usefulness still need checks. |
+| Tech Implementation | Six real Streamable HTTP MCP tools; persistence, reviewed writes, exact-message approval, grounded conversation and exports; production build and 223/223 unit/integration tests pass. Three actual Ollama read interpretations and a separate actual-model browser draft review passed. | General model accuracy is not established; complex inference may be slow. Native Alexa+, Bedrock and SMTP delivery are not live-verified. |
+| Design | The final full Edge run passed 128/128 desktop/mobile checks in 10.8 minutes, with no failures, skips or retries. Focused audio/report and contextual/five-persona runs also passed. | Controlled transcripts are not physical microphone or screen-reader validation. The creator confirmed audible playback once; broader audio and independent usefulness still need checks. |
 | Potential Impact | Sourced coordination problem and a complete fictional case from conflicting reports to reviewed follow-up and export. | No independent user study, measured benefit versus notes/email, or evidence of shorter repairs. |
 | Quality of the Idea | Neutral cross-party records, source-backed questions and receipt-versus-authorization review form a coherent workflow. | Global uniqueness and a competition score are not established. |
+
+### Grounded Conversation and Audible Replay: October 23
+
+The actual stored request `Compare the reports.` exposed an overly narrow
+command matcher, even after punctuation recovery was installed. Short report
+comparisons, "What did each side say?", and whole-request repair-delay questions
+now use a current MCP read without inference. Negated, compound and extra-action
+wording does not match these shortcuts. The Relay panel layout is unchanged.
+
+Specific question explanations now use that question's title, authored
+explanation and numbered/dated evidence. Model-assisted reads select a validated
+view rather than being replaced by an unrelated generic status. A comparison
+can be followed by "Ask the supplier for that reference"; the persisted focus
+survives reload but becomes unusable after the case changes. Review and exact
+approval remain necessary, and no conversational instruction authorizes delivery.
+
+**Live failures retained:** the initial tool-enabled small-model attempt took
+about 31.5 seconds and failed interpretation after an unnecessary invalid tool
+request. The first structured attempt selected an invalid view/question pairing.
+A later attempt answered an authorization question with the comparison view,
+and the installed `qwen3:4b-instruct` model asked for clarification on the receipt
+question while taking about 20.5 seconds for its first comparison. The small
+model also selected a recorded question for a future approval request. No
+generated prediction or automatic send reached the user: read text stayed
+host-rendered. These are integration/model-choice observations, not proven
+Ollama-runtime defects. Failed reports remain in ignored `.data/verification/`.
+
+**Changes from those observations:** JSON-schema-constrained read selection
+without model tools; smaller classification context; no irrelevant old report
+text when the user names a new topic; and deterministic future-outcome refusal.
+The warm `qwen2.5:1.5b` rerun passed all seven API steps: interpreted comparison,
+contextual review-only draft, interpreted receipt explanation, interpreted
+authorization explanation, future-outcome refusal, next-step read and redacted
+HTML export. There were **three actual model calls**, taking **970, 857 and
+803 ms end to end** in this run. The contextual draft took **103 ms**. This tiny
+development sample is not a latency guarantee, unseen-utterance accuracy study
+or user-benefit result. Report:
+`.data/verification/conversation-qwen2.5-1.5b-1792767849734.json`.
+
+The separate actual-model browser workflow passed: source-backed draft review
+opened with approval disabled in **8,464 ms**; a mobile browser loaded the
+persisted conversation without overflow or uncaught page errors. No message was
+approved or delivered. Reproduce with running local Ollama and downloaded model:
+
+```sh
+npm run test:conversation
+npm run test:ollama:ui
+```
+
+**Audio recovery:** enabling the speaker now replays the latest response.
+Paused synthesis resumes; playback failures and a six-second silent-start
+deadline leave the readable reply and offer retry. All 18 focused desktop/mobile
+audio/report checks passed in 1.1 minutes, including mute, stale callbacks,
+review boundaries and controlled no-start behavior. The creator then reported
+"I can hear the reply" after refreshing and toggling sound. This confirms a
+reported playback result on that device, not microphone accuracy, independent
+user feedback or full accessibility conformance. Report:
+`.data/verification/browser-audio-recovery-2026-10-23.json`.
+
+All five fictional personas and the new reload/context-staleness conversation
+passed on desktop/mobile: **12/12 focused checks in 2.3 minutes**. These are
+scripted fixtures, not 12 people. Report:
+`.data/verification/browser-contextual-conversation-2026-10-23.json`.
+The production build and 223/223 backend tests pass; log:
+`.data/verification/check-final-conversation-2026-10-23.log`.
+
+**Final complete browser run:** after the conversation and speech changes, all
+**128/128 desktop/mobile checks passed in 10.8 minutes**, with zero failures,
+skips, retries, flaky results or runner errors. Coverage includes all five
+personas, reply review, stale approvals, fresh drafts, persisted context,
+cross-case/async recovery, microphone denial, spoken replay, silent-start
+feedback, source navigation, exports, timezone editing, keyboard focus and
+automated accessibility/layout checks. These remain controlled fictional tests,
+not physical speech accuracy or independent user-benefit evidence. Report:
+`.data/verification/browser-final-conversation-2026-10-23.json`.
+
+The final six-tool scripted browser workflow also passed on this implementation:
+receipt answered from reviewed evidence, authorization still open, an obsolete
+draft blocked, one fresh approved **local capture**, one saved due item and an
+actual redacted HTML history. There were no unexpected API/page failures. The
+automated task clock was **5,040 ms**, excluding setup and human reading or
+decisions; it is not time saved or a usability study. All six MCP tools were
+called. Results and the checked export are in ignored
+`.data/verification/usefulness-final-conversation-2026-10-23/`.
+
+### Earlier Checks: October 23
 
 **Bug found and fixed:** saving an HTML verification export under `.data`
 caused Vite's development watcher to reload connected workspaces. This could
@@ -533,14 +628,14 @@ not record evidence, prepare/send a message or create a reminder. The Relay
 panel layout, dimensions and quick actions are unchanged. Punctuation recovery
 does not broaden write-command matching.
 
-After this change, the production build and **199/199 unit/integration tests**
+Earlier on October 23, after the punctuation/clarification change, the production build and **199/199 unit/integration tests**
 passed, including no-model clarification checks in all three assistant modes.
 **16/16 focused desktop/mobile checks passed in 1.5 minutes**, with zero skips
 or retries. They cover the reproduced transcript, explicit confirmation,
 history persistence, report playback, voice lifecycle, accessibility and
 case-isolation regressions. Report:
 `.data/verification/browser-speech-recovery-2026-10-23.json`. The full 122-check
-run above precedes this final change; no full 124-check rerun is claimed. The
+run above precedes that change; no full 124-check rerun was claimed at that point. The
 real microphone must be retried and independently observed feedback is pending.
 
 **Fresh scripted workflow:** `npm run measure:usefulness -- submission-2026-10-23`
@@ -1480,7 +1575,8 @@ and the actual downloaded HTML are saved under ignored
 
 Use fictional records. Grant microphone permission only if comfortable with the
 browser's audio processing. Ask `What is the next step?` and inspect its trace.
-Enable spoken replies and confirm only a new answer is read; muting must stop it.
+Enable spoken replies and confirm the latest answer is read, followed by new
+answers; muting must stop it. Loading/reloading alone must not start audio.
 Try `Record: the supplier said by phone that the replacement part is delayed.`
 Check the review fields/date before saving. Prepare a supplier request and verify
 capture is not labelled delivery. Try `Remind me tomorrow`, reload and check one
@@ -1598,7 +1694,9 @@ not independent user feedback. [Official FAQ](https://amazonappdev2026.devpost.c
 - [x] Label obsolete drafts clearly in exported case packs, not only in the workspace (October 22).
 - [x] Match exported numbered citations to linked, readable attributed-history source labels (October 22).
 - [x] Remove the verified chat-history startup dependency and parallelize settings/case-list loading; delayed/error-history and speech-history regressions pass. Earlier intermittent wait failures do not have a conclusively established root cause.
-- [ ] Verify physical microphone, audible replies and keyboard/screen-reader usability.
+- [ ] Verify physical microphone accuracy, broader speaker/device compatibility and keyboard/screen-reader usability.
+- [x] Creator reported hearing the latest reply after the October 23 replay fix. This is a single reported playback check; microphone accuracy, device compatibility and screen-reader usability remain open.
+- [x] Add and test question-specific grounded read selection, case-version-bound conversation focus and narrowly scoped contextual drafts; future-outcome questions cannot become predictions (October 23).
 - [x] Ground supported supplier/insurer read questions in dated MCP sources; make unsupported local questions explicit and contain speech-service/playback failures (October 22). Physical verification is still required for hardware claims.
 - [x] Remove model waits for supported case reads and redacted HTML history exports; October 19 working-tree verification is recorded above.
 - [x] Remove inference waits for supported exact recipient/topic draft requests; separately test the actual model path and preserve approval (October 22).
@@ -1644,8 +1742,8 @@ evidence map, not a winning probability or promise of full marks.
 | Time | Show and say |
 | --- | --- |
 | 0:00-0:15 | Open Maya's labelled fictional case. "MobilityRelay is a simulated Alexa+ repair assistant with a real MCP server. The supplier reports sending an estimate; the insurer reports not locating it." |
-| 0:15-0:35 | Ask/type "Compare the supplier and insurer reports" in Relay. Show its real MCP trace, dated source numbers and both quotations; open Evidence for the full text. "We don't decide who's at fault. We ask what information is missing." |
-| 0:35-0:55 | Ask/type "Prepare a request to the supplier about missing estimate reference". Show real `prepare_repair_request` trace and source-backed wording. Explain that this exact command uses deterministic MCP routing, not inference. Leave it unapproved. |
+| 0:15-0:35 | With the tested Ollama model enabled, ask/type "Put the accounts from the two organizations side by side." Show both dated source quotations and the real MCP trace. This wording exercises model interpretation into a validated read view; the source text comes from records, not generated facts. Warm the model first and retain honest wait timing. |
+| 0:35-0:55 | Ask/type "Ask the supplier for that reference." Show real `prepare_repair_request`, one scoped receipt question and source-backed wording. Explain that this contextual action uses the current, version-bound conversation focus and deterministic MCP routing, not a second inference call. Leave it unapproved. |
 | 0:55-1:20 | Say/type "The insurer replied: We received the estimate. Reference AB-47. Authorization is still pending." Label this a fictional reply. Confirm source/date, add the reply reference and open Preview changes. No evidence is saved yet. |
 | 1:20-1:40 | Show the exact receipt quotation. Select the receipt answer and explicitly confirm. "Received is not approved. Authorization is still unanswered." Show the real `record_repair_event` trace and persistent What changed summary. |
 | 1:40-2:00 | Open the old request: approval is disabled. Prepare a fresh draft from current questions; show authorization included and receipt excluded. Nothing is sent automatically. |
@@ -1717,6 +1815,8 @@ positives, friction and whether we would use the tool again.
 | Oct 20: application reply review / React / Playwright | Inspection found that the old stale-draft button reused old question IDs/body. A 320px screenshot also showed the preview retaining an offscreen title. New exact-label test selectors failed on populated nested controls; this was test code, not a proven vendor defect. | Fresh drafts now select current questions, preview resets scroll without stealing focus, and tests use accessible roles/names. Suggest testing before/after review, rejected saves and narrow-screen transitions together. | `server/replies.ts`, `tests/replies.test.ts`, `tests/reply-review.spec.ts`; fictional cases only, no delivered mail or independent user feedback. |
 | Oct 22: application routing, loading and browser speech | Common draft selection still waited for a model despite an explicit role/topic. Failed reads could leave a loading spinner; an empty speech session could end silently. These are application observations, not proven MCP/Ollama/browser defects. | Strict direct MCP draft commands, bounded read-only loading with retry, no-transcript feedback and five fictional-persona workflows. Keep complex-model latency, physical audio and independent usefulness claims separate. | `tests/demo-users.spec.ts`, `tests/api.test.ts`, `tests/agent.test.ts`, `tests/qa.spec.ts`; labelled scripted results, no human testimonials. |
 | Oct 23: application Vite watch configuration | Saving private verification HTML triggered development page reloads and could discard unsent input. A controlled browser regression reproduced it. | Exclude private data and generated test reports from file watching; keep private-file serving denied. Suggest testing generated exports with unsent input present. | Regression fails before the fix and passes on desktop/mobile afterward; final focused run 22/22, not a completed full-suite claim. |
+| Oct 23: application conversation / local model | The short comparison was rejected; an unnecessary tool call, invalid read pairing, irrelevant conversation context and wrong read views were observed in actual model tests. These are not established SDK/runtime defects. | Support natural read shortcuts; use JSON-schema-constrained view selection, minimal read context and deterministic outcome limits. Version-bound focus scopes contextual drafts. Suggest examples measuring correct interpretation, not just schema-valid output. | `tests/conversation.test.ts`, `tests/conversation.spec.ts`, `scripts/verify-conversation.ts`; failed attempts retained and later seven-step run passed with three real inference calls. |
+| Oct 23: application speech playback | Enabling sound after a reply did not replay it; the creator reported no audible output. | Replay the latest reply on explicit opt-in, prefer available English voices, resume paused synthesis and report silent startup. Suggest testing opt-in after history has loaded, not only before a new reply. | 18/18 focused browser checks passed. Creator subsequently reported hearing the reply; not an independent speech-accuracy study. |
 | Pending: Bedrock | No real account/model-enabled run observed. | Record access, tool use, latency/cost only after a controlled live test. No live AWS qualification claimed. | Optional `server/agent.ts` adapter, not live evidence. |
 | Pending: SMTP provider | No real provider delivery test observed. | Keep capture labels; record TLS setup, acceptance/error and receipt separately after testing. | No provider feedback claimed yet. |
 
@@ -1734,3 +1834,4 @@ environment restrictions and proven product defects.
 - [Alexa+ MCP quickstart](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-quickstart.html)
 - [Bedrock Converse](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/bedrock-runtime/command/ConverseCommand/)
 - [Ollama tool calling](https://docs.ollama.com/capabilities/tool-calling)
+- [Ollama structured outputs](https://docs.ollama.com/capabilities/structured-outputs)

@@ -92,6 +92,10 @@ available. Dictation shows live words, keeps listening across speech segments,
 and requires a separate send action. Manual editing cancels recording. Browser
 speech-service and microphone accuracy still need physical verification.
 An empty recording now gives recoverable feedback and preserves typed text.
+Enabling spoken replies reads the latest assistant reply, then new replies;
+muting stops playback. Browser-reported playback shows **Speaking...**, and a
+silent startup produces a retryable error. The creator confirmed hearing a reply
+after this fix; microphone accuracy and broader audio/accessibility are unverified.
 Report reads tolerate inserted periods between known command words. Supported
 ambiguous comparisons offer an explicit **Compare reports** confirmation rather
 than silently changing a misheard word; the original transcript stays in history.
@@ -105,6 +109,14 @@ limitation instead of an unrelated summary. Reply recognition is deliberately na
 statements and supplier appointment confirmations with an explicit date, time
 and UTC offset. Ambiguous wording remains evidence only. No connected inbox or
 independent verification is claimed.
+
+**Conversational continuity:** after **"Compare the reports"**, say
+**"Ask the supplier for that reference."** Relay uses the persisted, current-case
+question to prepare a review-only draft. Missing, changed or ambiguous context
+opens recipient/question selection instead of guessing. Specific questions such
+as **"What is blocking authorization?"** receive source-backed explanations.
+In AI mode, other read wording is interpreted into a validated view; the host
+renders recorded facts rather than displaying unrestricted model claims.
 
 ## MCP Integration
 
@@ -154,6 +166,7 @@ reads the case through MCP.
 Try **"What did the supplier say?"** or **"Compare the supplier and insurer
 reports"** for attributed evidence, without a model wait. These are reported
 statements, not a verdict on responsibility or a prediction of approval.
+**"Compare the reports"** and **"What did each side say?"** also work.
 
 **"Prepare a request to the supplier about missing estimate reference"** prepares
 a reviewed draft through real MCP without an inference wait, even with Ollama
@@ -178,8 +191,12 @@ npm run dev:ollama
 ```
 
 Open **http://127.0.0.1:4318**. This uses a separate fictional database and local
-message capture. CPU inference can take tens of seconds; generated content
-still needs review. Model weights are downloaded separately.
+message capture. Read interpretation uses schema-constrained selections, with
+answers rendered from current MCP records. In one warmed local run, three
+interpreted questions took 0.8-1.0 seconds each; a separate model-selected draft
+review took 8.5 seconds. These are small development checks, not latency or
+general accuracy guarantees. Other CPU inference can take tens of seconds.
+Model weights are downloaded separately.
 
 </details>
 
@@ -194,8 +211,9 @@ Windows, Node 24.11.0 and installed Microsoft Edge.
 | Check | Recorded result |
 | --- | --- |
 | TypeScript and production build | Passed. |
-| Unit and integration | **199 tests passed**, including real HTTP/MCP calls, direct drafts, bounded reads, comparison clarification, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
-| Browser workflows | **122/122 full desktop/mobile checks passed** before the final speech-recovery change. **16/16 focused checks passed afterward** in 1.5 minutes, including the actual misheard wording, confirmation persistence, report reads, speech lifecycle, accessibility and case isolation. Physical recognition and independent usefulness remain unverified. Earlier failures are retained in the guide. |
+| Unit and integration | **223 tests passed**, including real HTTP/MCP, grounded read interpretation, context freshness/isolation, direct drafts, provenance, approval, reply review and export integrity. Test files run sequentially; explicit concurrency checks remain covered. |
+| Browser workflows | **128/128 complete desktop/mobile checks passed in 10.8 minutes**, with no failures, skips or retries. Coverage includes all five fictional personas, conversation persistence/context freshness, approvals, speech recovery, exports, accessibility and case isolation. Earlier attempts are retained in the guide. |
+| Actual local AI | A seven-step fictional API journey passed with three real Ollama read-interpretation calls, a contextual MCP draft and redacted export. A separate real-model desktop draft review and mobile persisted conversation passed. These are not seven model calls or a general accuracy study. |
 | Accessibility and responsive layout | No automated violations in tested states. Keyboard focus, readable text, 44px header icon controls and desktop/mobile layout checks passed. |
 
 ```sh
@@ -203,6 +221,8 @@ npm run check
 npm run test:browser
 npm run test:demo
 npm run measure:usefulness
+# Optional, requires running Ollama and its downloaded local model:
+npm run test:conversation
 ```
 
 Browser tests require installed Microsoft Edge. Speech tests use simulated
@@ -217,8 +237,8 @@ Maya's full flow verifies receipt answered, authorization still open, stale
 approval blocked, a fresh reviewed follow-up and an exported history. These
 are scripted fictional personas, not recruited users or evidence of time saved.
 
-A real Ollama/MCP fictional-case walkthrough completed on October 22, before
-these UI fixes. The latest changes have not had a fresh clean-install or
+A real Ollama/MCP API and browser walkthrough completed on October 23 after
+the conversation changes. The latest changes have not had a fresh clean-install or
 complete Docker-stack verification. Detailed
 results, historical measurements and remaining work are in the
 [QA section of the project guide](docs/project-guide.md#4-testing-and-latest-results).
@@ -228,7 +248,7 @@ results, historical measurements and remaining work are in the
 - **Coordination, not repair:** the app cannot supply parts, diagnose faults, approve insurance, force a response or guarantee a faster repair.
 - **Capture, not delivery:** default messages stay in a local outbox. SMTP and Bedrock adapters are implemented but not live-verified. Follow-ups are local due items, not autonomous messages or background reminders.
 - **Prototype, not a clinical system:** this is a shared workspace with plaintext SQLite storage. Use fictional data. Browser speech may use a vendor service, and export redaction is limited and needs review.
-- **Explicit access limits:** native Alexa+, physical speech hardware and public hosting remain unverified. Independent user benefit has not been validated.
+- **Explicit access limits:** native Alexa+, physical microphone accuracy, broad speaker/device compatibility and public hosting remain unverified. The creator's successful playback report is not independent user-benefit validation.
 
 ## Repository Guide
 
