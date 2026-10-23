@@ -70,7 +70,7 @@ test('live dictation replaces interim words, preserves segments and never sends 
 test('specific report questions show dated sources and unsupported questions stay honest', async ({ page }, info) => {
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
   if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Message to Relay' }).fill('Compare the supplier and insurer reports');
+  await page.getByRole('textbox', { name: 'Message to Relay' }).fill('Compare the reports.');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
   const answer = page.getByRole('log').locator('.message-assistant').last();
   await expect(answer).toContainText('Latest supplier report, Source'); await expect(answer).toContainText('Latest insurer report, Source');

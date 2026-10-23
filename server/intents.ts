@@ -13,7 +13,7 @@ export function reportCommand(input: string): 'supplier' | 'insurer' | 'both' | 
   const text = reportText(input);
   const party = /^(?:what did (?:the |my )?(supplier|insurer) (?:say|report)|(?:show|read) (?:me )?(?:the |my )?(?:latest )?(supplier|insurer) (?:report|update))$/i.exec(text);
   if (party) return (party[1] ?? party[2]).toLowerCase() as 'supplier' | 'insurer';
-  return /^(?:compare (?:the |my )?(?:supplier and insurer|insurer and supplier) (?:reports|updates)|(?:show|read) (?:me )?(?:the |my )?(?:latest )?reports from both (?:sides|parties))$/i.test(text) ? 'both' : null;
+  return /^(?:compare (?:(?:the |my )?(?:(?:supplier and insurer|insurer and supplier) )?|both )(?:reports|updates)|(?:show|read) (?:me )?(?:the |my )?(?:latest )?reports from both (?:sides|parties)|what did (?:each (?:side|party)|both (?:sides|parties)) (?:say|report)|why are (?:the |my )?(?:supplier and insurer|insurer and supplier) saying different things)$/i.test(text) ? 'both' : null;
 }
 
 export function needsReportClarification(input: string) {
@@ -27,6 +27,7 @@ export function directCaseCommand(input: string): 'read' | 'export' | null {
     /^(?:(?:show|tell me|what is|what's) (?:my |the )?next step|next step)$/i,
     /^(?:(?:show|list) (?:my |the )?(?:reminders?|follow[- ]?ups?)|(?:what is|what's) (?:my |the )?next follow[- ]?up)$/i,
     /^(?:help me understand )?(?:what is|what's) holding up (?:this|my) repair$/i,
+    /^why is (?:this|my|the) repair (?:stuck|delayed)$/i,
   ].some(pattern => pattern.test(text))) return 'read';
   if (/^(?:(?:export|download) (?:my |the |a )?(?:case |repair )?(?:history|packet)|(?:make|prepare) (?:my |the |a )?case (?:history|packet))(?: as html)?$/i.test(text)) return 'export';
   return null;

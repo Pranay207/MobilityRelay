@@ -79,6 +79,11 @@ for (const mode of ['local', 'bedrock', 'ollama'] as const) test(`${mode} HTTP c
     const reports = await ask('Compare the. Supplier and insurer. Reports.'); assert.equal(reports.status, 200);
     const comparison = await reports.json() as AgentReply;
     assert.ok(comparison.spokenText); assert.ok(comparison.spokenText.length < comparison.reply.length);
+    for (const text of ['Compare the reports.', 'What did each side say?']) {
+      const natural = await ask(text); assert.equal(natural.status, 200);
+      const result = await natural.json() as AgentReply; assert.equal(result.reply, comparison.reply);
+      assert.deepEqual(result.traces.map(trace => trace.tool), ['get_repair_brief']);
+    }
     const history = await (await fetch(`${running.url}/api/cases/${repair.id}/chat`, { headers })).json() as ChatMessage[];
     assert.equal(history.at(-1)?.text, comparison.reply); assert.equal(history.at(-1)?.spokenText, comparison.spokenText);
     assert.deepEqual(running.store.brief(repair.id), before);
