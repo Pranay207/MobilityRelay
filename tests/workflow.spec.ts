@@ -134,6 +134,18 @@ test('speech service errors preserve typed text and never submit or write eviden
   await expect(page.getByRole('log').locator('.message')).toHaveCount(messageCount);
 });
 
+test('an empty speech session ends with recoverable feedback instead of silently losing typed text', async ({ page }, info) => {
+  await mockSpeech(page, {}); let writes = 0;
+  page.on('request', request => { if (request.method() === 'POST') writes++; });
+  await page.goto('/'); await expect(page.getByRole('heading', { name: 'Power chair repair', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: 'Open Relay', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Message to Relay' }).fill('Keep this unfinished question');
+  await page.getByRole('button', { name: 'Start voice input', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Recording ended without a transcript' }).first()).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Message to Relay' })).toHaveValue('Keep this unfinished question');
+  await expect(page.getByRole('button', { name: 'Start voice input', exact: true })).toBeEnabled(); expect(writes).toBe(0);
+});
+
 test('failed spoken output leaves a readable reply and ignores old playback errors', async ({ page }, info) => {
   await page.addInitScript(() => {
     const utterances: SpeechSynthesisUtterance[] = [];

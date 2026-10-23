@@ -112,11 +112,13 @@ export function Assistant({ messages, busy, suspended = false, settings, onSend,
     try {
       const voice = new Voice(); voice.lang = 'en-IN'; voice.continuous = true; voice.interimResults = true;
       const prefix = text.trimEnd();
+      let heard = false;
       voice.onresult = event => {
         if (recognition.current !== voice) return;
         // Results contain the whole recording, including revised interim words.
         const transcript = Array.from(event.results, result => result[0]?.transcript.trim() ?? '').filter(Boolean).join(' ');
         if (transcript) {
+          heard = true;
           const combined = prefix ? `${prefix} ${transcript}` : transcript;
           setText(combined.slice(0, 4000));
           if (combined.length > 4000) { cancelVoice(); setListening(false); onError('The voice transcript reached the 4000-character limit. Review it before sending.'); }
@@ -133,7 +135,7 @@ export function Assistant({ messages, busy, suspended = false, settings, onSend,
         };
         if (event.error !== 'aborted') onError(errors[event.error] ?? 'Voice input stopped. Try again or use text instead.');
       };
-      voice.onend = () => { if (recognition.current !== voice) return; recognition.current = null; setListening(false); }; recognition.current = voice;
+      voice.onend = () => { if (recognition.current !== voice) return; recognition.current = null; setListening(false); if (!heard) onError('Recording ended without a transcript. Your typed text is unchanged; try again or use text.'); }; recognition.current = voice;
       voice.start(); setListening(true);
     } catch { cancelVoice(); setListening(false); onError('The microphone could not start. Try again or use text.'); }
   };
