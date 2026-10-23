@@ -49,6 +49,46 @@ user-maintained, cross-party history and reviewed follow-up, not a claim that
 repair tracking is new or that this approach is globally unique.
 [Example supplier workflow](https://www.nsm-seating.com/service-repair/).
 
+### Existing Options and Our Testable Difference
+
+Public product documentation reviewed **October 23, 2026**. These are documented
+capabilities, not hands-on accounts or a complete market census. "Not documented"
+does not mean a feature is absent. Supplier-connected information can be more
+authoritative than our manually entered reports.
+
+| Existing Option | What Its Own Documentation Describes | Boundary of Our Comparison |
+| --- | --- | --- |
+| [myNumotion](https://www.numotion.com/about-mynumotion-app) | Order information, notifications, service requests, appointments, estimates, invoices and live chat. | Tracking and communication already exist. The cited overview does not establish whether it supports our exact cross-party reply-review and stale-draft workflow; that is unknown, not a claimed missing feature. |
+| [NSM / MyNSMOrder](https://www.nsm-seating.com/stay-connected/) | Text updates and order status/details, accessed with work-order ID and last name. | We are not a replacement for the supplier's system. Its overview is not evidence for or against user-owned reconciliation across multiple organisations. |
+| [MyPermobil](https://www.permobil.com/en-gb/permobil-produkte/elektrorollstuehle/functions/mypermobil) | Battery, distance and seat-use information, with remote chair data available to the service centre. | Connected equipment diagnostics are valuable and outside our scope. We have no equivalent live chair data or remote repair capability. |
+| [CareSource's Alexa skill](https://www.caresource.com/oh/members/tools-resources/caresource-amazon-alexa-skill/medicaid/) | Account-linked questions about benefits, refills, care-manager contacts and related support. | Healthcare voice access is not new. This is an advertised Alexa skill, not a verified Alexa+ MCP repair-workflow integration; current device behaviour was not tested. |
+| [Solace advocates](https://www.solace.health/contact-us) | Human help coordinating care, organising records, following up and resolving insurance problems. | People already perform cross-party coordination. MobilityRelay is a bounded record/follow-up aid, not a substitute for an advocate's expertise, authority or relationships. |
+| [ProPublica Claim File Helper](https://projects.propublica.org/claimfile/) | A customisable letter requesting the records used for an insurance denial. | Evidence-request letters already exist. Our coverage-refusal question is not a legal claim-file request or an appeal service. |
+| Notes and email | A person can manually retain reports, compose messages and assemble a handover. | This is the practical baseline to test. We do not assume that a dedicated app is faster or easier for every person. |
+
+**What we can demonstrate in our own implementation:** retain both dated
+reports -> ask for missing receipt information -> quote a reply for user review
+-> answer receipt without answering authorization -> block approval of the old
+draft -> prepare a fresh follow-up -> export the attributed history. This is a
+specific workflow claim supported by tests, not proof that competitors lack it.
+
+The proposed benefit is less reconstruction and fewer stale/unsupported
+follow-ups. It remains a hypothesis until an independent person attempts an
+equivalent task with notes/email and with the app. No measured time saving,
+shorter repair, clinical outcome, worldwide novelty or winning probability is
+claimed.
+
+Targeted public searches included `wheelchair repair MCP`, GitHub wheelchair
+repair/MCP queries, Alexa wheelchair repair skills and the official MCP Registry.
+This limited scan did not establish an exact equivalent; it cannot inspect
+private projects, unindexed skills, unreleased products or every registry entry.
+[Official MCP Registry](https://registry.modelcontextprotocol.io/).
+
+**Submission wording:** "MobilityRelay demonstrates a user-maintained,
+source-backed wheelchair-repair coordination workflow through six real MCP
+tools. It preserves disagreements as questions, requires reviewed answers and
+fresh message approval, and produces a handover history."
+
 ### The User Journey
 
 1. Create a case and add supplier/insurer contacts.
