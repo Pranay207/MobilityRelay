@@ -13,19 +13,18 @@
 ![Zod](https://img.shields.io/badge/Zod-3E67B1?style=flat-square&logo=zod&logoColor=white)
 ![MCP Streamable HTTP](https://img.shields.io/badge/MCP-Streamable_HTTP-176B52?style=flat-square)
 
-**When wheelchair repair updates conflict, know what to ask next.**
+**Turn conflicting wheelchair repair updates into clear next steps.**
 
-A voice-and-text workspace for wheelchair users and caregivers to organize
-repair reports, prepare reviewed follow-ups and share a dated case history.
-MobilityRelay preserves what each party reported without deciding who is right.
+A voice-and-text repair coordination workspace for wheelchair users and
+caregivers, powered by a real MCP server. Organize dated reports, prepare
+reviewed follow-ups and share the case history without assigning blame.
 
-Built for the **Alexa+ track** of the Amazon Developer Hackathon: an independent
-voice/text **Alexa+ experience simulator**, backed by a real self-hosted MCP
-server over **Streamable HTTP**.
+Built for the **Alexa+ track** of the Amazon Developer Hackathon as an independent
+**Alexa+ experience simulator**, using **Streamable HTTP**.
 
-[Overview](#the-problem) | [Quick Start](#quick-start) |
-[MCP Integration](#mcp-integration) | [Verification](#verification) |
 [Demo Script](docs/project-guide.md#6-demo-script-target-245) |
+[Quick Start](#quick-start) | [Architecture](#mcp-integration) |
+[Verified Results](#verification) |
 [Project Guide](docs/project-guide.md)
 
 ## Product Preview
