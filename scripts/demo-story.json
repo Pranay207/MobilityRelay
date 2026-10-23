@@ -1,0 +1,66 @@
+{
+  "title": "MobilityRelay",
+  "voice": "Microsoft David Desktop",
+  "scenes": [
+    {
+      "id": "intro",
+      "chapter": "A repair delay should not become a paperwork maze.",
+      "seconds": 8,
+      "narration": "A broken wheelchair can interrupt daily life. MobilityRelay helps its user find the next question when repair updates conflict."
+    },
+    {
+      "id": "compare",
+      "chapter": "01 / Two reports. One unanswered question.",
+      "seconds": 23,
+      "narration": "This is Maya's fictional case in our Alexa plus experience simulator. Her supplier reports sending the estimate. Her insurer cannot locate it. I type a natural request. Ollama selects a validated view, and the host reads current records through real M C P. Dated sources stay visible. Neither party is labelled wrong."
+    },
+    {
+      "id": "draft",
+      "chapter": "02 / Context becomes a reviewed next step.",
+      "seconds": 15,
+      "narration": "Now I ask the supplier for that reference. Relay uses the current case context to prepare a source-backed request through M C P. The wording is ready for review. It has not been approved or sent."
+    },
+    {
+      "id": "review",
+      "chapter": "03 / Preview the change before saving it.",
+      "seconds": 23,
+      "narration": "Next, I enter a fictional insurer reply: we received the estimate; authorization is still pending. I identify the source and reference, then preview the changes. The exact receipt quotation is shown beside the proposed answer. Nothing is saved yet, and the answer starts unchecked."
+    },
+    {
+      "id": "confirm",
+      "chapter": "04 / Received is not approved.",
+      "seconds": 17,
+      "narration": "I select only the receipt answer and explicitly confirm the review. The record now shows one fewer open question. Authorization remains unanswered. The reply is attributed evidence, not independent verification, and no successful repair is claimed."
+    },
+    {
+      "id": "stale",
+      "chapter": "05 / Old evidence must not authorize a new message.",
+      "seconds": 20,
+      "narration": "That new evidence makes the old draft stale. Its approval control is disabled. I prepare a fresh request from the current case. It asks about authorization, not the receipt question already answered. This safeguard is enforced by the service, not by a model promising to be careful."
+    },
+    {
+      "id": "capture",
+      "chapter": "06 / Exact message. Explicit approval.",
+      "seconds": 16,
+      "narration": "I inspect the recipient and exact message, then approve it. The result is clearly marked local capture. No email is delivered in this demo. Approval is bound to the reviewed message and case version, and the model cannot grant it."
+    },
+    {
+      "id": "followup",
+      "chapter": "07 / Keep the next check visible.",
+      "seconds": 14,
+      "narration": "Remind me tomorrow creates a real, persistent local due item through M C P. Reloading keeps it. This is a workspace follow-up, not an autonomous chase or a promise of a notification."
+    },
+    {
+      "id": "export",
+      "chapter": "08 / A record someone else can follow.",
+      "seconds": 18,
+      "narration": "Finally, I export the actual redacted history. It keeps the sources, reviewed answer, remaining question and stale draft trail together. The user can review it before sharing with a caregiver or advocate. Redaction is limited, so personal information still needs checking."
+    },
+    {
+      "id": "close",
+      "chapter": "A clearer next step. A record worth handing over.",
+      "seconds": 10,
+      "narration": "Six real M C P tools. User-reviewed actions. No claim of faster repairs or guaranteed approval. MobilityRelay turns conflicting updates into a clearer next step."
+    }
+  ]
+}
