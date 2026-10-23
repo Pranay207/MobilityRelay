@@ -1891,7 +1891,7 @@ evidence map, not a winning probability or promise of full marks.
 
 ### Generated Cut: October 23
 
-A narrated local cut is now generated: **177.2 seconds (2:57.2), 1920x1080,
+A narrated local cut is now generated: **177.1 seconds (2:57.1), 1920x1080,
 H.264 video with stereo AAC audio, approximately 13 MB**. It has not been
 uploaded or submitted. Output files are intentionally ignored by Git:
 
@@ -1936,6 +1936,40 @@ The encoder is separate ignored tooling, not a new application dependency.
 Before publishing, review the complete MP4 and upload it to a public YouTube
 or Vimeo URL. Replace the README's pending link and verify the submitted URL
 while signed out. No upload or submission is claimed by these local scripts.
+
+### Judge-to-Demo Verification: October 23
+
+The [official rules](https://amazonappdev2026.devpost.com/rules) were rechecked
+against the implemented code and actual capture. The four criteria are equally
+weighted. This is a submission audit, not a prediction of judging results:
+
+| Criterion | Evidence shown in the final cut | What this does not establish |
+| --- | --- | --- |
+| Tech Implementation | All six MCP tools called over Streamable HTTP; an actual Ollama interpretation; a reviewed reply updates receipt but not authorization; stale approval is disabled; fresh exact-message approval leads to local capture. | Native Alexa+ access, live email delivery or AWS execution. |
+| Design | Source-linked reports, preview before recording, explicit approval, a visible two-open-to-one-open change, a saved due item surviving reload and a readable export. | Independent usability results or physical microphone accuracy. |
+| Potential Impact | A specific repair-coordination task, published problem evidence and a source-linked history that can be handed over. | Measured repair acceleration or proven real-world benefit. |
+| Quality of the Idea | Stateful repair coordination with source attribution and evidence-bound approvals, rather than a single-turn Q&A demonstration. | Global uniqueness or a guaranteed shortlist or win. |
+
+The introduction cites [Worobey et al.'s repair study](https://experts.umn.edu/en/publications/wheelchair-repairs-delays-causes-and-associated-outcomes/)
+(2025, DOI `10.1016/j.apmr.2024.10.001`). Among 301 wheelchair users with spinal
+cord injury reporting repairs, vendor noncompletion after contact was the most
+common reason for incomplete repairs. This supports the problem context, not
+MobilityRelay's effectiveness; it is not a prevalence claim about all users.
+
+The first cut made the stale-warning text visible but framed the disabled
+approval control poorly. The retake scrolls the actual disabled checkbox into
+view and holds it for six seconds, keeps reviewed-reply controls visible and
+shows the before/after question counts. Representative final encoded frames
+were inspected, not only raw screenshots. The retake again recorded zero
+application errors, all six tools and one real model inference.
+
+The final closing describes implemented features only. Fictional-case,
+computer-narration and local-capture labels remain so the footage cannot be
+mistaken for a live supplier/insurer integration. The final MP4 and sidecars
+replaced the earlier files at the paths above; the original cut is retained
+under `.data/demo-video-2026-10-23/first-cut/`. Full creator playback, public
+video upload, private-repository reviewer access and submission still need
+external confirmation.
 
 ### Original 2:45 Recording Plan
 
@@ -2022,7 +2056,8 @@ positives, friction and whether we would use the tool again.
 | Oct 23: application timestamp handling | String ordering of valid ISO timestamps with different UTC offsets selected the wrong stage or next follow-up. Source dates could be labelled UTC without conversion. | Compare instants consistently and normalize explicit UTC labels while preserving raw evidence and reviewed messages. Suggest offset-crossing and equal-instant fixtures, not just `Z` timestamps. | Four regressions failed before the fix and pass afterward; targeted real-MCP desktop/mobile checks passed 2/2. |
 | Oct 23: npm / transitive dependency | The current audit reported a moderate `ip-address@10.7.3` advisory. Registry TLS initially failed on this Windows host. | Updated the compatible transitive dependency to 10.7.4 and used Node system trust roots, keeping TLS verification enabled. Suggest separating environment trust errors from actual audit results. | Production and full npm audits then reported zero known advisories; [upstream advisory](https://github.com/advisories/GHSA-rxp7-6hxx-x8q5). This is not proof of complete security. |
 | Oct 23: application startup and review latency | A failed startup could look like an empty workspace. Read-only proposals waited for a redundant case read; one measured 4,583 ms. A controlled post-login failure also exposed an initialization race. | Explicit read-only recovery, one bounded GET connection retry and initialized-state gating; review-only proposals no longer reload unchanged case data. Fixture GETs allow one documented reset retry, never write replay. | Regression attempts and focused results are retained in the submission reliability section. The original connection-reset cause is not established; no unconditional smoothness claim. |
-| Oct 23: local demo recording/encoding setup | No FFmpeg was on PATH and Playwright's recording binary was absent. These were setup prerequisites, not reproduced product defects. | Installed Playwright FFmpeg and a separate `ffmpeg-static@5.3.0` encoder under ignored tooling. Suggest a recording preflight that checks the recorder and final export encoder separately. | Actual six-tool capture and final 177.2-second MP4 passed decoding/metadata checks; listening review and public upload remain separate. |
+| Oct 23: local demo recording/encoding setup | No FFmpeg was on PATH and Playwright's recording binary was absent. These were setup prerequisites, not reproduced product defects. | Installed Playwright FFmpeg and a separate `ffmpeg-static@5.3.0` encoder under ignored tooling. Suggest a recording preflight that checks the recorder and final export encoder separately. | Actual six-tool capture and final 177.1-second MP4 passed decoding/metadata checks; listening review and public upload remain separate. |
+| Oct 23: demo presentation review | The first cut showed the stale warning but made its disabled approval checkbox easy to miss; reviewed form controls needed clearer framing. This was a capture issue, not a reproduced application defect. | Retook real interactions with explicit scrolling, a six-second disabled-control hold and a visible two-open-to-one-open result. | Final encoded frames inspected; full playback approval remains the creator's check. |
 | Pending: Bedrock | No real account/model-enabled run observed. | Record access, tool use, latency/cost only after a controlled live test. No live AWS qualification claimed. | Optional `server/agent.ts` adapter, not live evidence. |
 | Pending: SMTP provider | No real provider delivery test observed. | Keep capture labels; record TLS setup, acceptance/error and receipt separately after testing. | No provider feedback claimed yet. |
 

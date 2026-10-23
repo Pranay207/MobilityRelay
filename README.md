@@ -36,14 +36,14 @@ case, with computer-generated narration and captions. YouTube upload is pending.
 
 | Approximate time | What the walkthrough demonstrates |
 | --- | --- |
-| `0:00-0:10` | The repair-coordination problem and project introduction. |
+| `0:00-0:10` | The repair-coordination problem, sourced research context and project introduction. |
 | `0:10-0:34` | Conflicting reports, dated sources, actual Ollama interpretation and MCP calls. |
 | `0:34-0:49` | A contextual, source-backed request prepared for review. |
 | `0:49-1:30` | A reviewed reply confirms receipt while authorization remains unanswered. |
 | `1:30-2:09` | Stale approval is blocked; a fresh request receives explicit approval into local capture. |
 | `2:09-2:23` | A saved local due item survives reload. |
 | `2:23-2:43` | Redacted history export with sources and the remaining question. |
-| `2:43-2:57` | Six real tools, implementation summary and honest scope limits. |
+| `2:43-2:57` | Six real tools, source-backed records and user-reviewed actions. |
 
 [Full recording script](docs/project-guide.md#6-demo-script-target-245).
 
