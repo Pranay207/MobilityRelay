@@ -122,9 +122,19 @@ Windows instructions, Gmail testing and Docker.
 
 ## MCP Integration
 
-```text
-React workspace -> Express host -> MCP SDK client over HTTP
-                -> /mcp server -> validated repair tools -> SQLite
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 24, "rankSpacing": 28, "padding": 12}}}%%
+flowchart LR
+    accTitle: MobilityRelay architecture
+    accDescr: Voice and text enter the React workspace. The Express host uses an official MCP client to call six validated tools over Streamable HTTP. Repair rules and approval checks protect SQLite records and local message capture. Ollama interpretation is optional and cannot grant approval.
+
+    UI["React app<br/>Voice and text"] --> HOST["Express host<br/>Session and CSRF"]
+    HOST --> CLIENT["MCP client<br/>Official SDK"]
+    HOST -. "Optional" .-> AI["Ollama<br/>Interpretation only"]
+    CLIENT -->|"Streamable<br/>HTTP"| MCP["/mcp server<br/>Six tools"]
+    MCP --> RULES["Repair service<br/>Rules and approval"]
+    RULES --> DB[("SQLite<br/>Case history")]
+    RULES --> OUTBOX["Local outbox<br/>Approved capture"]
 ```
 
 The host initializes an MCP connection, discovers tools and calls them over
