@@ -1387,7 +1387,7 @@ software verification, not independent user research or proof of repair benefit.
 | Physical speech | Controlled English browser speech tests passed; real microphone, speakers and assistive-technology behavior remain unverified. |
 | Independent user benefit | Not tested. The agent-run workflow below is not a participant testimonial or a measurement of human effort saved. |
 | Repository access | Authenticated clone succeeded. GitHub's unauthenticated repository API returned 404; public visibility and accepted reviewer invitations could not be verified. |
-| Video/submission | No public video or completed submission link was supplied for checking. The script and feedback exist, but publication, duration and submitted fields remain unverified. |
+| Video/submission | At this audit, no public video or completed submission link was supplied. See Section 6 for the subsequently generated cut and October 24 YouTube link; completed Devpost submission remains unverified. |
 | Latest container / optional AWS | Docker engine was unavailable, so the latest image was not rebuilt/retested. Earlier dated container results remain below. Live Bedrock/AWS Builder use is still unverified. |
 
 The initial sandboxed build failed with subprocess `EPERM`; the unchanged
@@ -1891,9 +1891,14 @@ evidence map, not a winning probability or promise of full marks.
 
 ### Generated Cut: October 23
 
-A narrated local cut is now generated: **177.1 seconds (2:57.1), 1920x1080,
-H.264 video with stereo AAC audio, approximately 13 MB**. It has not been
-uploaded or submitted. Output files are intentionally ignored by Git:
+A narrated cut is generated: **177.1 seconds (2:57.1), 1920x1080,
+H.264 video with stereo AAC audio, approximately 13 MB**.
+
+**YouTube demo:** [Watch MobilityRelay](https://youtu.be/5D_LI0jyQ2o).
+The creator supplied this uploaded-video link on October 24. YouTube's public
+oEmbed endpoint returned video metadata without authentication. Complete
+signed-out playback and completed Devpost submission have not been verified.
+Local output files are intentionally ignored by Git:
 
 - `.data/demo-video-2026-10-23/MobilityRelay-demo-upload.mp4`: latest captioned upload cut with the shortened source credit.
 - `.data/demo-video-2026-10-23/MobilityRelay-demo-1080p.mp4`: previous captioned cut; Windows kept it locked during the final credit edit.
@@ -1935,9 +1940,9 @@ node scripts/render-demo.mjs
 ```
 
 The encoder is separate ignored tooling, not a new application dependency.
-Before publishing, review the complete MP4 and upload it to a public YouTube
-or Vimeo URL. Replace the README's pending link and verify the submitted URL
-while signed out. No upload or submission is claimed by these local scripts.
+The README now links the supplied YouTube URL through the project thumbnail.
+Review the complete uploaded video while signed out and use that same URL in
+Devpost. The local scripts generate files; they do not upload or submit them.
 
 ### Judge-to-Demo Verification: October 23
 
@@ -1974,9 +1979,9 @@ The final closing describes implemented features only. Fictional-case,
 computer-narration and local-capture labels remain so the footage cannot be
 mistaken for a live supplier/insurer integration. The final MP4 and sidecars
 replaced the earlier files at the paths above; the original cut is retained
-under `.data/demo-video-2026-10-23/first-cut/`. Full creator playback, public
-video upload, private-repository reviewer access and submission still need
-external confirmation.
+under `.data/demo-video-2026-10-23/first-cut/`. The creator subsequently supplied
+the YouTube link above. Complete uploaded-video playback, private-repository
+reviewer access and completed submission still need external confirmation.
 
 ### Original 2:45 Recording Plan
 

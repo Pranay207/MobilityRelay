@@ -29,10 +29,13 @@ Built for the **Alexa+ track** of the Amazon Developer Hackathon as an independe
 
 ## Demo Video
 
-**YouTube walkthrough:** Link will be added after upload.
+[![Watch the MobilityRelay demo: wheelchair repair updates, real MCP tools and reviewed actions](assets/mobilityrelay-youtube-thumbnail.png)](https://youtu.be/5D_LI0jyQ2o)
 
-The locally generated **2:57 English demo** follows Maya's fictional repair
-case, with computer-generated narration and captions. YouTube upload is pending.
+> **[Watch the 2:57 product demonstration on YouTube](https://youtu.be/5D_LI0jyQ2o)**
+
+Follow Maya's fictional repair case through six real MCP tools, reviewed
+actions and a source-linked history export. English computer-generated
+narration and captions are included.
 
 | Approximate time | What the walkthrough demonstrates |
 | --- | --- |
