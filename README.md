@@ -13,11 +13,11 @@
 ![Zod](https://img.shields.io/badge/Zod-3E67B1?style=flat-square&logo=zod&logoColor=white)
 ![MCP Streamable HTTP](https://img.shields.io/badge/MCP-Streamable_HTTP-176B52?style=flat-square)
 
-**Wheelchair repair coordination.**
+**When wheelchair repair updates conflict, know what to ask next.**
 
-MobilityRelay helps wheelchair users and caregivers turn scattered repair
-updates into a dated case history, clear next questions and reviewed follow-ups.
-It preserves what each party reported without deciding who is right.
+A voice-and-text workspace for wheelchair users and caregivers to organize
+repair reports, prepare reviewed follow-ups and share a dated case history.
+MobilityRelay preserves what each party reported without deciding who is right.
 
 Built for the **Alexa+ track** of the Amazon Developer Hackathon: an independent
 voice/text **Alexa+ experience simulator**, backed by a real self-hosted MCP
@@ -63,6 +63,17 @@ noncompletion after contact was the most common reported reason for incomplete
 repairs. This supports the coordination problem, not the effectiveness of our
 app or a population estimate for all wheelchair users.
 [Read the study](https://pubmed.ncbi.nlm.nih.gov/39427781/).
+
+## What Changes
+
+Maya's **fictional walkthrough** illustrates the workflow, not a measured
+real-world outcome:
+
+| Step | Case state |
+| --- | --- |
+| Before | The supplier reports sending the estimate; the insurer reports not locating it. The receipt question is unanswered. |
+| After review | The user records a receipt confirmation with its source, prepares a fresh authorization follow-up and can export the dated history. |
+| Still unresolved | Authorization remains pending. Confirmed receipt is not insurance approval or a completed repair. |
 
 ## How It Works
 
