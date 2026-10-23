@@ -1459,6 +1459,54 @@ alternate task order. Never email a real supplier. Record completion, seconds,
 wrong sources/recipients/dates, unsupported claims and assistance. Ask what was
 confusing; keep objections, not just compliments.
 
+#### Matched Fictional Tasks: Notes/Email Versus MobilityRelay
+
+This is a **ready-to-run protocol, not a completed study**. Use anonymous
+participant codes and their consent. Do not collect disability, health or
+insurance details. A student/friend can test clarity but cannot establish
+wheelchair-user outcomes.
+
+Give one case to notes/email and the other to MobilityRelay. Flip a coin for
+the first method; reverse the method order for the next participant. Provide
+the same type of source text and task goals in both methods. Include reading,
+data entry, corrections and handover preparation in the clock; do not compare
+a prefilled app against an empty notes document. Do not send any email.
+
+| Fictional Input | Case A | Case B |
+| --- | --- | --- |
+| Person / repair reference | Robin / STUDY-A | Taylor / STUDY-B |
+| Supplier / address | Pine Mobility / supplier-a@example.invalid | Lake Mobility / supplier-b@example.invalid |
+| Insurer / address | Cedar Cover / insurer-a@example.invalid | Elm Cover / insurer-b@example.invalid |
+| Supplier email, Oct 21 at 10:00 UTC | "We sent the repair estimate to your insurer." | "We submitted the repair estimate to your insurer." |
+| Insurer email, Oct 22 at 10:00 UTC | "We cannot locate the estimate. Please ask the supplier for its submission reference." | "The estimate is not in our records. Please obtain the submission reference from the supplier." |
+| Insurer email, Oct 22 at 11:00 UTC | "Authorization is pending." | "Authorization is still pending." |
+| Give only after the initial draft | "We received the estimate. Reference A-47. Authorization is still pending." | "We received the estimate. Reference B-62. Authorization is still pending." |
+
+Participant task: understand the two accounts, prepare a neutral follow-up,
+incorporate the later insurer reply, update the follow-up appropriately,
+schedule a next check and produce a history another person can understand.
+Give goals, not button-by-button instructions. Log any coaching requested.
+Stop each trial at ten minutes if unfinished and record it as incomplete.
+
+Use the same outcome checklist for both methods:
+
+1. Both original reports are attributed and dated, without assigning blame.
+2. The first draft requests the missing submission/receipt information from
+   an appropriate contact; every quoted statement matches its source.
+3. The later receipt is recorded as a report, not proof of authorization or
+   repair completion.
+4. The obsolete request is replaced or explicitly labelled for revision.
+5. The next follow-up concerns authorization, with an explicit future due time.
+6. The handover preserves sources, the receipt reference, remaining uncertainty
+   and local-only message status; no actual supplier or insurer is contacted.
+
+Record completion, elapsed seconds, checklist items met (0-6), wrong
+recipients/dates/quotes, unsupported claims, unintended sends and assistance.
+Ask which step was hardest and what they would do differently. Keep exact
+anonymous observations, including negative feedback. Leave the result table
+below empty until a real participant completes the task. With a tiny sample,
+report individual attempts rather than percentages or general time savings.
+
 Independent user testing is recommended evidence for Design/Potential Impact,
 not a listed submission prerequisite. The agent-run checks above confirm
 software outputs only; do not enter them as an independent participant below.
