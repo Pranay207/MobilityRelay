@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AudioLines, CalendarClock, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Download, FileText, FolderOpen, Inbox, LoaderCircle, Mail, MailOpen, Menu, Plus, Search, Settings2, ShieldCheck, Trash2, Users, X } from 'lucide-react';
+import { AudioLines, CalendarClock, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Download, FileText, FolderOpen, Inbox, LoaderCircle, Mail, MailOpen, Menu, Plus, RefreshCw, Search, Settings2, ShieldCheck, Trash2, Users, X } from 'lucide-react';
 import type { AgentReply, Brief, ChatMessage, Contact, Draft, Followup, Question, RepairCase, RepairEvent, Settings, ToolTrace, UpdateProposal } from '../shared/types';
 import { stageLabels } from '../shared/types';
 import { displayAnswer } from '../shared/presentation';
@@ -29,6 +29,7 @@ export default function App() {
   const refreshGeneration = useRef(0);
   const [brief, setBrief] = useState<Brief | null>(null); const [messages, setMessages] = useState<ChatMessage[]>([]); const [settings, setSettings] = useState<Settings | null>(null);
   const [conversationReady, setConversationReady] = useState(false);
+  const [caseLoadError, setCaseLoadError] = useState('');
   const [tab, setTab] = useState<Tab>('Overview'); const [dialog, setDialog] = useState<Dialog | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [search, setSearch] = useState(''); const [sidebar, setSidebar] = useState(false); const [highlight, setHighlight] = useState(''); const [traces, setTraces] = useState<ToolTrace[]>([]);
   const caseNavigation = useRef<HTMLElement>(null);
@@ -45,27 +46,28 @@ export default function App() {
   }, [selected, cases.length, sidebar]);
   const addTraces = (next: ToolTrace[]) => setTraces(current => [...next, ...current].slice(0, 30));
   const loadCases = async (generation = refreshGeneration.current) => { const list = await api<RepairCase[]>('/api/cases'); if (generation === refreshGeneration.current) setCases(list); return list; };
-  const refresh = async (id = selectedRef.current) => {
+  const refresh = async (id = selectedRef.current, knownCases?: RepairCase[]) => {
     // A poll started before a user action must not rewind the displayed record.
     const generation = ++refreshGeneration.current;
     const current = () => generation === refreshGeneration.current && selectedRef.current === id;
+    let loaded = false;
     try {
-      const list = await loadCases(generation);
+      const list = knownCases?.some(c => c.id === id) ? knownCases : await loadCases(generation);
       if (!current()) return;
       if (!id || !list.some(c => c.id === id)) { setSelected(initialCase(list)); if (!list.length) { setBrief(null); setMessages([]); } return; }
       const result = await api<{ data: Brief; traces: ToolTrace[] }>(`/api/cases/${id}`);
       if (!current()) return;
-      setBrief(result.data); addTraces(result.traces);
+      loaded = true; setBrief(result.data); setCaseLoadError(''); addTraces(result.traces);
       const chat = await api<ChatMessage[]>(`/api/cases/${id}/chat`);
       if (current()) { setMessages(chat); setConversationReady(true); }
-    } catch (err) { if (current()) { setConversationReady(true); throw err; } }
+    } catch (err) { if (current()) { if (!loaded) setCaseLoadError(err instanceof Error ? err.message : 'Case could not be loaded.'); setConversationReady(true); throw err; } }
   };
   useEffect(() => { void api<{ authenticated: boolean; csrf?: string }>('/api/session').then(async result => {
     if (result.csrf) setCsrf(result.csrf); setAuthenticated(result.authenticated);
     if (result.authenticated) { const [settings, list] = await Promise.all([api<Settings>('/api/settings'), loadCases()]); setSettings(settings); setSelected(initialCase(list)); }
     setReady(true);
   }).catch(err => { setError(err.message); setReady(true); }); }, []);
-  useEffect(() => { if (!selected || !authenticated) return; setBrief(null); setMessages([]); setConversationReady(false); setHighlight(''); void refresh(selected).catch(err => setError(err.message)); }, [selected, authenticated]);
+  useEffect(() => { if (!selected || !authenticated) return; setBrief(null); setMessages([]); setConversationReady(false); setCaseLoadError(''); setHighlight(''); void refresh(selected, cases).catch(err => setError(err.message)); }, [selected, authenticated]);
   useEffect(() => { if (!authenticated) return; const timer = setInterval(() => { if (!busy) void refresh().catch(() => {}); }, 20000); return () => clearInterval(timer); }, [authenticated, busy]);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 6000); return () => clearTimeout(timer); }, [notice]);
   useEffect(() => {
@@ -116,7 +118,7 @@ export default function App() {
     <div className="workspace"><header className="topbar"><div><IconButton label="Open case navigation" className="mobile-only" onClick={() => setSidebar(true)}><Menu size={21} /></IconButton><span className="desktop-only">Cases</span><span className="mobile-only mobile-brand">MobilityRelay</span><ChevronRight size={14} /><strong>{brief?.repairCase.reference || 'Workspace'}</strong></div><div><span className="mcp-status"><span className="status-dot" /> {brief ? 'MCP verified' : 'MCP pending'}</span>{mobile && brief && <button className="relay-launch" aria-label="Open Relay" title="Open Relay" onClick={() => setRelayOpen(true)}><AudioLines size={20} /><span>Relay</span></button>}<IconButton label="Workspace settings" onClick={() => setDialog({ type: 'settings' })}><Settings2 size={19} /></IconButton></div></header>
       {error && <div className="alert error" role="alert"><CircleHelp size={18} /><span>{error}</span><IconButton label="Dismiss error" onClick={() => setError('')}><X size={17} /></IconButton></div>}
       {notice && <div className="alert success" role="status"><CheckCircle2 size={18} /><span>{notice}</span></div>}
-      {!brief ? <main className="empty-workspace">{selected ? <><LoaderCircle className="spin" size={24} /><h2>Loading case...</h2></> : <><FolderOpen size={42} /><h1>Your repair workspace</h1><button className="primary" onClick={() => setDialog({ type: 'case' })}><Plus size={17} /> New repair case</button></>}</main> : <>
+      {!brief ? <main className="empty-workspace">{selected ? caseLoadError ? <><CircleHelp size={24} /><h2>Case could not be loaded</h2><button className="secondary" onClick={() => { setCaseLoadError(''); setError(''); void refresh(selected).catch(err => setError(err.message)); }}><RefreshCw size={17} /> Retry loading case</button></> : <><LoaderCircle className="spin" size={24} /><h2>Loading case...</h2></> : <><FolderOpen size={42} /><h1>Your repair workspace</h1><button className="primary" onClick={() => setDialog({ type: 'case' })}><Plus size={17} /> New repair case</button></>}</main> : <>
         <section className="case-heading"><div><div className="eyebrow"><span>{brief.repairCase.category}</span>{brief.repairCase.fictional && <span className="fictional-badge">FICTIONAL CASE</span>}</div><h1>{brief.repairCase.title}</h1><p><span className="person-initial">{brief.repairCase.person.slice(0, 1)}</span>{brief.repairCase.person}<span className="separator">/</span>{brief.repairCase.equipment}</p></div><div className="heading-actions"><IconButton className="secondary compact-action" label="Export history" onClick={() => setDialog({ type: 'export' })} disabled={busy}><Download size={18} /></IconButton><button className="secondary" onClick={() => setDialog({ type: 'reply' })} disabled={busy}><MailOpen size={17} /> Review reply</button><IconButton className="secondary compact-action" label="Record update" onClick={() => setDialog({ type: 'event' })} disabled={busy}><Plus size={19} /></IconButton></div></section>
         <div className="case-metrics"><div><span>Reported stage</span><strong>{brief.reportedStage}</strong></div><div><span>Unanswered questions</span><strong>{open.length.toString().padStart(2, '0')}<small>{answered.length} answered</small></strong></div><div><span>Recorded sources</span><strong>{brief.events.length.toString().padStart(2, '0')}<small>Attributed updates</small></strong></div><div><span>Next follow-up</span><strong>{scheduled[0] ? time(scheduled[0].dueAt, scheduled[0].timezone) : 'Not scheduled'}{scheduled[0] && <small>{scheduled[0].timezone}</small>}</strong></div></div>
         <div className={`content-layout ${mobile ? 'relay-drawer-layout' : ''}`}><main className="case-content"><div className="tabs" role="tablist" aria-label="Case views">{(['Overview', 'Evidence', 'Requests', 'Follow-ups', 'Contacts'] as Tab[]).map(t => <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{t}{t === 'Requests' && drafts.length > 0 && <span>{drafts.length}</span>}</button>)}</div>
